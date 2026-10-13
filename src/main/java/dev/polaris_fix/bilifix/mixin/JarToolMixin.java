@@ -3,6 +3,7 @@ package dev.polaris_fix.bilifix.mixin;
 import dev.polaris_fix.bilifix.BiliFixMod;
 import dev.polaris_fix.bilifix.config.BiliFixConfig;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -20,7 +21,15 @@ import java.util.List;
  *   <li>--vout ...       → --vout <vout 配置>（默认 gl,any；配置 original 则不动）</li>
  * </ul>
  * 其余参数原样保留。支持 "--key value" 与 "--key=value" 两种 VLC 参数写法。
+ *
+ * <p>鲁棒性设计：</p>
+ * <ul>
+ *   <li>@Pseudo：watermedia 未安装时本 Mixin 静默跳过，绝不硬失败</li>
+ *   <li>若参数表中没有 --avcodec-hw / --vout，主动追加安全值，防止未来 watermedia
+ *       改参数表导致修复失效</li>
+ * </ul>
  */
+@Pseudo
 @Mixin(targets = "org.watermedia.core.tools.JarTool", remap = false)
 public class JarToolMixin {
 
@@ -34,15 +43,20 @@ public class JarToolMixin {
         String vout = BiliFixConfig.voutValue();
 
         List<String> fixed = new ArrayList<>(original.length + 4);
+        boolean sawHw = false;
+        boolean sawVout = false;
+
         for (int i = 0; i < original.length; i++) {
             String arg = original[i];
             switch (arg) {
                 case "--avcodec-hw" -> {
+                    sawHw = true;
                     fixed.add("--avcodec-hw");
                     fixed.add(hw);
                     if (i + 1 < original.length && isValue(original[i + 1])) i++;
                 }
                 case "--vout" -> {
+                    sawVout = true;
                     if (vout != null) {
                         fixed.add("--vout");
                         fixed.add(vout);
@@ -59,8 +73,10 @@ public class JarToolMixin {
                 }
                 default -> {
                     if (arg.startsWith("--avcodec-hw=")) {
+                        sawHw = true;
                         fixed.add("--avcodec-hw=" + hw);
                     } else if (arg.startsWith("--vout=")) {
+                        sawVout = true;
                         if (vout != null) fixed.add("--vout=" + vout);
                         else fixed.add(arg); // vout=original：原样保留
                     } else {
@@ -68,6 +84,18 @@ public class JarToolMixin {
                     }
                 }
             }
+        }
+
+        // 未来防御：参数表中没有 --avcodec-hw 时主动补加，确保修复始终生效
+        if (!sawHw) {
+            fixed.add("--avcodec-hw");
+            fixed.add(hw);
+            BiliFixMod.LOGGER.info("[BiliFix] 参数表中未找到 --avcodec-hw，已主动追加安全值: {}", hw);
+        }
+        if (vout != null && !sawVout) {
+            fixed.add("--vout");
+            fixed.add(vout);
+            BiliFixMod.LOGGER.info("[BiliFix] 参数表中未找到 --vout，已主动追加: {}", vout);
         }
 
         if (BiliFixConfig.verbose) {
@@ -80,8 +108,8 @@ public class JarToolMixin {
         cir.setReturnValue(fixed.toArray(new String[0]));
     }
 
-    /** VLC 参数值不会以 -- 开头 */
+    /** VLC 参数值不会以 - 开头（长选项 -- 与短选项 - 都排除） */
     private static boolean isValue(String s) {
-        return !s.startsWith("--");
+        return !s.startsWith("-");
     }
 }

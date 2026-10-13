@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.1 — 2026-10-14
+
+### 修复（代码审查发现）
+- **严重**：watermedia 未安装时 Mixin 硬失败会拖崩游戏启动——加 `@Pseudo` 注解 + mixins.json `required: false`，现在 watermedia 缺失时 BiliFix 静默跳过，绝不添乱
+- **未来防御**：watermedia 参数表若不再含 `--avcodec-hw` / `--vout`，现在会**主动补加**安全参数，防止上游改版导致修复失效
+- `isValue` 边界收紧：以 `-` 开头（含短选项）一律不当作参数值
+
+### 测试
+- 回归测试从 25 个增加到 31 个，全部通过
+
 ## 1.1.0 — 2026-10-14
 
 ### 新增
@@ -20,3 +30,4 @@
 - `--avcodec-hw d3d11va,dxva2,any` → `--avcodec-hw none`（禁用硬解，修复无声崩溃）
 - `--vout direct3d11,glwin32,gl,any` → `--vout gl,any`（去掉 D3D11 vout 偏好）
 - 修复现象：游戏退出码 -1、无 Java 崩溃堆栈、崩溃分析器无结果
+

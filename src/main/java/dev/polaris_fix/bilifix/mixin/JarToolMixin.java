@@ -28,6 +28,11 @@ import java.util.List;
  *   <li>若参数表中没有 --avcodec-hw / --vout，主动追加安全值，防止未来 watermedia
  *       改参数表导致修复失效</li>
  * </ul>
+ *
+ * <p>并发性（第 5 轮审查结论）：readArray 仅由 PlayerAPI.start() 在启动线程
+ * 串行调用一次（registerFactory 本身是 synchronized）；本 Mixin 无共享可变状态，
+ * 无并发风险。覆盖范围：一切经 watermedia 播放的模组（netmusic、waterframes、
+ * create_waterframes 等）都在此入口统一受益。</p>
  */
 @Pseudo
 @Mixin(targets = "org.watermedia.core.tools.JarTool", remap = false)

@@ -98,10 +98,12 @@ Then play the video that previously crashed the game — it should no longer exi
 ## Building From Source
 
 ```powershell
-./build.ps1   # compile + run 37 regression tests + package
+./build.ps1   # compile + run 43 regression tests + package
 ```
 
-Requires a local JDK 21 (the Minecraft runtime JDK works) and the game libraries on disk.
+The script auto-detects the JDK 21 (Minecraft runtime works) and the game
+libraries folder. Overrides: `BILIFIX_JAVAC=<javac path>`, `BILIFIX_LIBS=<libraries dir>`,
+`-WatermediaJar <path>`.
 
 ## License
 

@@ -98,10 +98,10 @@ verbose = false
 ## 从源码构建
 
 ```powershell
-./build.ps1   # 编译 + 37 项回归测试 + 打包
+./build.ps1   # 编译 + 43 项回归测试 + 打包
 ```
 
-需要本地 JDK 21（Minecraft 运行时自带即可）和磁盘上的游戏库文件。
+脚本自动探测 JDK 21（Minecraft 运行时即可）与游戏库目录。可用环境变量覆盖：BILIFIX_JAVAC、BILIFIX_LIBS，或参数 -WatermediaJar。
 
 ## 许可
 

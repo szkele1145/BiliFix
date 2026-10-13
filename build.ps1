@@ -46,9 +46,9 @@ if ($p.ExitCode -ne 0) { Get-Content "$OutDir\javac-stderr.txt" -ErrorAction Sil
 Write-Host "编译完成" -ForegroundColor Green
 
 # 回归测试
-if (Test-Path "$root\build\Regression.java") {
+if (Test-Path "$root\src\test\java\Regression.java") {
     New-Item -ItemType Directory -Force -Path "$OutDir\test" | Out-Null
-    & $javac -encoding UTF-8 -d "$OutDir\test" "$root\build\Regression.java"
+    & $javac -encoding UTF-8 -d "$OutDir\test" "$root\src\test\java\Regression.java"
     & $javaExe -cp "$OutDir\test" Regression
     if ($LASTEXITCODE -ne 0) { throw "回归测试失败" }
     Write-Host "回归测试通过" -ForegroundColor Green

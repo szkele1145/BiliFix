@@ -137,6 +137,13 @@ public final class BiliFixConfig {
         lines.add("");
         lines.add("# 日志中打印完整参数替换详情");
         lines.add("verbose = false");
-        Files.write(path, lines, StandardCharsets.UTF_8);
+        // 原子写：先写临时文件再 ATOMIC_MOVE，磁盘满/中断不会留下半个配置文件
+        Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+        Files.write(tmp, lines, StandardCharsets.UTF_8);
+        try {
+            Files.move(tmp, path, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 }

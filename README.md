@@ -89,7 +89,7 @@ Also applies to any mod playing videos through watermedia 2.1 (netmusic, waterfr
 After launching, the log should contain:
 
 ```
-[BiliFix] v1.3.0 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] v1.3.1 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 16 项 → 新 16 项)
 ```
 

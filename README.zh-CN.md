@@ -87,11 +87,21 @@ verbose = false
 启动游戏后日志中应出现：
 
 ```
-[BiliFix] v1.2.1 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] v1.3.1 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] ==== BiliFix 环境诊断 ====
+[BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 16 项 → 新 16 项)
 ```
 
 然后播放之前必崩的视频，游戏不再退出。
+
+## 从源码构建
+
+```powershell
+./build.ps1   # 编译 + 37 项回归测试 + 打包
+```
+
+需要本地 JDK 21（Minecraft 运行时自带即可）和磁盘上的游戏库文件。
 
 ## 许可
 

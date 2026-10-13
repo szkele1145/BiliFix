@@ -12,11 +12,9 @@ modId="neoforge"
 type="required"
 versionRange="[21.1,)"
 ordering="NONE"
-side="BOTH"
 
 [[dependencies.bilifix]]
 modId="watermedia"
 type="optional"
 versionRange="[2.1,)"
 ordering="AFTER"
-side="CLIENT"

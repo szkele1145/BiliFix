@@ -73,17 +73,20 @@ verbose = false
 |---|---|
 | Minecraft | 1.21.1 |
 | NeoForge | 21.1.x |
-| watermedia | 2.1+（实测 2.1.36） |
+| watermedia | **2.1.x**（实测 2.1.36） |
 | bilibili_media | 2.3 |
 
 理论上同样适用于所有用 watermedia 2.1 播放视频的场景（netmusic、waterframes 等），不限 B 站。
+
+> **关于 watermedia 3.0**：3.0 是完全重构的架构（弃用内嵌 libVLC，改用 ffmpeg/WaterTx 媒体引擎），
+> 不存在本模组修复的 D3D11VA 崩溃路径，**无需也无效**。本模组只针对 watermedia 2.1.x。
 
 ## 验证修复是否生效
 
 启动游戏后日志中应出现：
 
 ```
-[BiliFix] v1.1.0 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] v1.2.1 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 16 项 → 新 16 项)
 ```
 

@@ -31,6 +31,7 @@ $cp = @(
     "$lib\net\neoforged\mergetool\2.0.0\mergetool-2.0.0-api.jar",
     "$lib\net\neoforged\neoforge\21.1.248\neoforge-21.1.248-universal.jar",
     "$lib\org\slf4j\slf4j-api\2.0.7\slf4j-api-2.0.7.jar",
+    "D:\PCL2\.minecraft\versions\航空学这一块\航空学这一块.jar",
     $WatermediaJar
 ) -join ';'
 

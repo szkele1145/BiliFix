@@ -3,7 +3,7 @@
 # Usage: ./build.ps1 [-WatermediaJar <path>] [-OutDir <dir>]
 
 param(
-    [string]$WatermediaJar = "C:\Users\一只屑\AppData\Local\Temp\bm_analysis\water.jar",
+    [string]$WatermediaJar = "",
     [string]$OutDir = ""
 )
 
@@ -11,13 +11,44 @@ $ErrorActionPreference = 'Stop'
 # Locate script dir ($PSScriptRoot can be empty in some invocation styles)
 $root = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 if (-not $OutDir) { $OutDir = Join-Path $root 'build' }
-$javac = 'C:\Users\一只屑\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\javac.exe'
-$jar = 'C:\Users\一只屑\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\jar.exe'
-$javaExe = 'C:\Users\一只屑\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\java.exe'
-$lib = 'D:\PCL2\.minecraft\libraries'
+
+# ---- Locate a JDK 21 (javac/jar/java): env override > PATH > common Minecraft runtime locations ----
+$javac = $null
+if ($env:BILIFIX_JAVAC) {
+    $javac = $env:BILIFIX_JAVAC
+} else {
+    $fromPath = Get-Command javac -ErrorAction SilentlyContinue
+    if ($fromPath) { $javac = $fromPath.Source }
+}
+if (-not $javac) {
+    # Probe common Minecraft runtime JDK locations (PCL / vanilla launcher layouts)
+    $home2 = $env:USERPROFILE
+    $candidates = @(
+        "$env:APPDATA\.minecraft\runtime\java-runtime-delta\bin\javac.exe",
+        "$home2\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\javac.exe",
+        "C:\Users\一只屑\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\javac.exe"
+    )
+    foreach ($c in $candidates) { if (Test-Path $c) { $javac = $c; break } }
+}
+if (-not $javac) { throw "javac not found. Set BILIFIX_JAVAC=<path to javac.exe> or add a JDK 21 to PATH" }
+$jdkBin = Split-Path -Parent $javac
+$jar = Join-Path $jdkBin 'jar.exe'
+$javaExe = Join-Path $jdkBin 'java.exe'
+
+# ---- Locate game libraries dir: env override > PCL default > vanilla default ----
+$lib = $env:BILIFIX_LIBS
+if (-not $lib) { $lib = 'D:\PCL2\.minecraft\libraries' }
+if (-not (Test-Path $lib)) { $lib = "$env:APPDATA\.minecraft\libraries" }
+if (-not (Test-Path $lib)) { throw "game libraries dir not found. Set BILIFIX_LIBS=<path to .minecraft\libraries>" }
+$mcDir = Split-Path -Parent $lib
 
 if (-not (Test-Path $javac)) { throw "javac not found: $javac (Minecraft runtime JDK required)" }
-if (-not (Test-Path $WatermediaJar)) { Write-Warning "watermedia jar not found ($WatermediaJar) - compile continues (@Pseudo target missing is only a warning)" }
+# Locate watermedia jar for the @Mixin target: param > mods folder of the game dir
+if (-not $WatermediaJar) {
+    $probe = Get-ChildItem "$mcDir\versions\*\mods\watermedia-*.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($probe) { $WatermediaJar = $probe.FullName }
+}
+if (-not (Test-Path $WatermediaJar)) { Write-Warning "watermedia jar not found - compile continues (@Pseudo target missing is only a warning)" }
 
 # Version (read from mods.toml)
 $toml = Get-Content "$root\src\main\resources\META-INF\neoforge.mods.toml" -Raw -Encoding UTF8

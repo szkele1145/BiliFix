@@ -58,17 +58,16 @@ public class JarToolMixin {
                     sawHw = true;
                     fixed.add("--avcodec-hw");
                     fixed.add(hw);
-                    if (i + 1 < original.length && isValue(original[i + 1])) i++;
+                    i = skipOldValue(original, i); // 丢弃旧值
                 }
                 case "--vout" -> {
                     sawVout = true;
                     if (vout != null) {
                         fixed.add("--vout");
                         fixed.add(vout);
-                        // 跳过原值
-                        if (i + 1 < original.length && isValue(original[i + 1])) i++;
+                        i = skipOldValue(original, i); // 丢弃旧值
                     } else if (i + 1 < original.length && isValue(original[i + 1])) {
-                        // vout=original：保留原参数与原值
+                        // vout=original：保留原参数与原值（消费掉，防重复处理）
                         fixed.add("--vout");
                         fixed.add(original[i + 1]);
                         i++;
@@ -116,5 +115,10 @@ public class JarToolMixin {
     /** VLC 参数值不会以 - 开头（长选项 -- 与短选项 - 都排除） */
     private static boolean isValue(String s) {
         return !s.startsWith("-");
+    }
+
+    /** 若 args[i+1] 是值（不以 - 开头），返回 i+1 跳过它；否则返回 i。用于丢弃被替换掉的旧值。 */
+    private static int skipOldValue(String[] args, int i) {
+        return (i + 1 < args.length && isValue(args[i + 1])) ? i + 1 : i;
     }
 }

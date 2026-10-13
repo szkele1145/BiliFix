@@ -2,7 +2,6 @@ package dev.polaris_fix.bilifix;
 
 import org.slf4j.Logger;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,9 +10,9 @@ import java.util.List;
  *
  * 检测项：
  * 1. watermedia 是否在 classpath（不在则 BiliFix 处于待命状态，正常）
- * 2. watermedia 内置参数中是否含 D3D11VA/DXVA2 硬解（确认修复必要性）
- * 3. 显卡/驱动信息（崩溃与驱动相关，帮助定位）
- * 4. JVM 是否为 64 位（32 位 JVM 内存不足也会导致原生崩溃）
+ * 2. JVM 架构与内存（32 位 JVM / 低内存也是原生崩溃风险因素）
+ * 3. 操作系统版本
+ * 4. GPU 型号（Windows 注册表查询；崩溃与驱动相关，帮助定位）
  */
 public final class EnvironmentDiagnostics {
     private EnvironmentDiagnostics() {}

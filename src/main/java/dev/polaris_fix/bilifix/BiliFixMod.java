@@ -23,13 +23,13 @@ import org.slf4j.LoggerFactory;
  *   <li>--vout direct3d11,glwin32,gl,any → --vout gl,any（去掉 D3D11 vout 偏好）</li>
  * </ul></p>
  *
- * <p>v1.2.0 新增：可配置的硬解策略（none/auto/自定义）、vout 策略、
+ * <p>v1.2.1 新增：可配置的硬解策略（none/auto/自定义）、vout 策略、
  * 配置文件位于 .minecraft/config/bilifix.toml，修改后重启游戏生效。</p>
  */
 @Mod(BiliFixMod.MOD_ID)
 public class BiliFixMod {
     public static final String MOD_ID = "bilifix";
-    public static final String VERSION = "1.2.0";
+    public static final String VERSION = "1.2.1";
     public static final Logger LOGGER = LoggerFactory.getLogger("BiliFix");
 
     public BiliFixMod(ModContainer container) {

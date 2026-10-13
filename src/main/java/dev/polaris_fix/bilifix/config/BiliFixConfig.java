@@ -49,6 +49,9 @@ public final class BiliFixConfig {
                 if (kv.containsKey("hwDecoder")) hwDecoder = kv.get("hwDecoder");
                 if (kv.containsKey("vout"))      vout      = kv.get("vout");
                 if (kv.containsKey("verbose"))  verbose   = "true".equalsIgnoreCase(kv.get("verbose"));
+                // 触发一次校验，让无效值在启动时就发出警告
+                hwDecoderValue();
+                voutValue();
                 BiliFixMod.LOGGER.info("[BiliFix] 已加载配置: {}", path);
             }
         } catch (Exception e) {
@@ -56,22 +59,26 @@ public final class BiliFixConfig {
         }
     }
 
-    /** hwDecoder 的最终 VLC 参数值："disable" 与 "none" 等价 */
+    /** hwDecoder 的最终 VLC 参数值："disable" 与 "none" 等价；未知值回退 none 并警告 */
     public static String hwDecoderValue() {
-        return switch (hwDecoder.toLowerCase()) {
+        return switch (hwDecoder.toLowerCase().trim()) {
             case "disable", "none", "off" -> "none";
             case "auto", "any" -> "any";
             case "d3d11va" -> "d3d11va";
             case "dxva2" -> "dxva2";
-            default -> "none";
+            default -> {
+                BiliFixMod.LOGGER.warn("[BiliFix] 未知的 hwDecoder 配置值 '{}'，回退到安全默认 none", hwDecoder);
+                yield "none";
+            }
         };
     }
 
-    /** vout 的最终 VLC 参数值："original" 表示保留 watermedia 原始值 */
+    /** vout 的最终 VLC 参数值："original" 表示保留 watermedia 原始值；其他值标准化为小写 */
     public static String voutValue() {
-        return switch (vout.toLowerCase()) {
+        String v = vout.toLowerCase().trim();
+        return switch (v) {
             case "original", "keep" -> null; // null → 不替换
-            default -> vout;
+            default -> v;
         };
     }
 
@@ -85,14 +92,30 @@ public final class BiliFixConfig {
             int eq = s.indexOf('=');
             if (eq <= 0) continue;
             String k = s.substring(0, eq).trim();
-            String v = s.substring(eq + 1).trim();
-            // 去引号
-            if (v.length() >= 2 && v.startsWith("\"") && v.endsWith("\"")) {
-                v = v.substring(1, v.length() - 1);
-            }
+            String v = stripValue(s.substring(eq + 1).trim());
             kv.put(k, v);
         }
         return kv;
+    }
+
+    /**
+     * 提取配置值：支持引号内嵌 '#'、引号后行内注释两种 TOML 常见写法。
+     * <ul>
+     *   <li>"gl,any" → gl,any（引号包裹，可含 #）</li>
+     *   <li>"gl,any" # 说明 → gl,any（引号后跟注释）</li>
+     *   <li>true → true（裸值，# 后为注释）</li>
+     * </ul>
+     */
+    static String stripValue(String raw) {
+        if (raw.isEmpty()) return raw;
+        if (raw.charAt(0) == '"') {
+            int end = raw.indexOf('"', 1);
+            if (end > 0) return raw.substring(1, end);
+            return raw.substring(1); // 未闭合引号：取剩余全部
+        }
+        int hash = raw.indexOf('#');
+        if (hash >= 0) return raw.substring(0, hash).trim();
+        return raw;
     }
 
     static void writeDefault(Path path) throws IOException {

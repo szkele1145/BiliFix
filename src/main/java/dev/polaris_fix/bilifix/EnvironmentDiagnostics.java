@@ -39,7 +39,13 @@ public final class EnvironmentDiagnostics {
             report.add("OS: " + System.getProperty("os.name", "unknown")
                     + " " + System.getProperty("os.version", ""));
 
-            // 4. OpenGL/显卡：通过 Debug 输出（无法安全拿到，跳过；由 VLC 日志承担）
+            // 4. GPU 检测（Windows 注册表，跨平台安全降级）
+            String gpu = detectGpu();
+            if (gpu != null) {
+                report.add("GPU: " + gpu + (gpu.toLowerCase().contains("basic display") || gpu.toLowerCase().contains("microsoft")
+                        ? " ⚠ 使用了基础显示驱动，图形栈可能异常" : ""));
+            }
+
             // 5. 可用内存
             long maxMem = Runtime.getRuntime().maxMemory() / (1024 * 1024);
             report.add("JVM 最大内存: " + maxMem + " MB" + (maxMem < 2048 ? " ⚠ 偏低，视频解码可能吃紧" : " ✓"));
@@ -49,6 +55,34 @@ public final class EnvironmentDiagnostics {
             // 诊断绝不能崩游戏
             logger.debug("[BiliFix] 环境诊断异常（忽略）: {}", t.toString());
         }
+    }
+
+    /**
+     * 检测 GPU 名称：仅 Windows（注册表查询），非 Windows 返回 null 安全降级。
+     * 查询超时/失败均静默——诊断功能永不影响游戏。
+     */
+    private static String detectGpu() {
+        if (!System.getProperty("os.name", "").toLowerCase().contains("win")) return null;
+        try {
+            Process p = new ProcessBuilder("reg", "query",
+                    "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}",
+                    "/v", "DriverDesc").redirectErrorStream(true).start();
+            // 3 秒超时保护
+            if (!p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                return null;
+            }
+            var output = new java.util.Scanner(p.getInputStream()).useDelimiter("\\A").next();
+            for (String line : output.split("\n")) {
+                if (line.contains("DriverDesc") && line.contains("REG_SZ")) {
+                    int i = line.indexOf("REG_SZ");
+                    String name = line.substring(i + 6).trim();
+                    if (!name.isEmpty()) return name;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     private static boolean checkClass(String fqn) {

@@ -5,6 +5,7 @@
 [![Modrinth](https://img.shields.io/badge/Modrinth-available-brightgreen)](https://modrinth.com/mod/bilifix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-blue)](https://github.com/szkele1145/BiliFix/releases)
+[![Version](https://img.shields.io/badge/version-1.3.2-blue)](CHANGELOG.md)
 
 [English](README.md) | **简体中文**
 

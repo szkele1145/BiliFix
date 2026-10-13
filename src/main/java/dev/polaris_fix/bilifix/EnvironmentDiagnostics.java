@@ -60,6 +60,9 @@ public final class EnvironmentDiagnostics {
     /**
      * 检测 GPU 名称：仅 Windows（注册表查询），非 Windows 返回 null 安全降级。
      * 查询超时/失败均静默——诊断功能永不影响游戏。
+     *
+     * <p>实现注意：先在后台线程读完进程输出再 waitFor，避免管道缓冲区满导致
+     * 的经典死锁（waitFor 与读流顺序颠倒时可能发生）。</p>
      */
     private static String detectGpu() {
         if (!System.getProperty("os.name", "").toLowerCase().contains("win")) return null;
@@ -67,13 +70,25 @@ public final class EnvironmentDiagnostics {
             Process p = new ProcessBuilder("reg", "query",
                     "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}",
                     "/v", "DriverDesc").redirectErrorStream(true).start();
+            // 后台线程读流防死锁
+            var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
+            var lines = new java.util.ArrayList<String>();
+            var t = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = reader.readLine()) != null) lines.add(line);
+                } catch (Throwable ignored) {
+                }
+            }, "BiliFix-GPU-Detect");
+            t.setDaemon(true);
+            t.start();
             // 3 秒超时保护
             if (!p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
                 p.destroyForcibly();
                 return null;
             }
-            var output = new java.util.Scanner(p.getInputStream()).useDelimiter("\\A").next();
-            for (String line : output.split("\n")) {
+            t.join(500);
+            for (String line : lines) {
                 if (line.contains("DriverDesc") && line.contains("REG_SZ")) {
                     int i = line.indexOf("REG_SZ");
                     String name = line.substring(i + 6).trim();

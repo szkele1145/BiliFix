@@ -2,101 +2,107 @@
 
 **Fixes the silent JVM crash (exit code -1) caused by watermedia/libVLC D3D11VA hardware decoding when playing Bilibili videos in Minecraft modpacks.**
 
-修复整合包播放 B 站视频时游戏无声崩溃（退出码 -1、无任何 Java 崩溃堆栈）的问题。
-
 [![Modrinth](https://img.shields.io/badge/Modrinth-available-brightgreen)](https://modrinth.com/mod/bilifix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-blue)](https://github.com/szkele1145/BiliFix/releases)
 
-## 问题是什么？
+**English** | [简体中文](README.zh-CN.md)
 
-用 **bilibili_media**（B 站视频解析）+ **watermedia**（内嵌 libVLC）+ **waterframes**（播放屏幕）的整合包/服务器，看视频一段时间后游戏会**直接消失**：
+Fixes the silent JVM crash that kills the game (exit code **-1**, no Java stack trace) when playing Bilibili videos in modpacks using **bilibili_media** + **watermedia** + **waterframes**.
 
-- PCL 显示 `Minecraft 已退出，返回值：-1`
-- 日志结尾只有正常的聊天记录或 VLC 输出，**没有任何 Java 异常**
-- 崩溃分析器显示"未找到可能的原因"
+## The Problem
 
-## 根因
+Modpacks combining **bilibili_media** (Bilibili URL resolver) + **watermedia** (embedded libVLC) + **waterframes** (video screens) suffer a silent death:
 
-watermedia 创建 VLC 实例时写死了（`videolan/arguments.json`）：
+- The game process just **vanishes** — PCL reports `Minecraft exited, return code: -1`
+- The log tail shows normal chat or VLC output, **no Java exception at all**
+- Crash analyzers find nothing
+
+## Root Cause
+
+watermedia hardcodes these VLC launch args in `videolan/arguments.json`:
 
 ```
 --vout direct3d11,glwin32,gl,any
 --avcodec-hw d3d11va,dxva2,any
 ```
 
-强制 D3D11VA/DXVA2 硬解码。解码线程把硬解表面经 vlcj 回调拷贝到 Java 堆时，在部分显卡驱动/多线程场景下**原生层直接崩溃，杀死整个 JVM**——所以没有任何 Java 层的痕迹。
+This forces **D3D11VA/DXVA2 hardware decoding**. The decoder thread copies hardware surfaces back to the Java heap via vlcj callbacks; on some GPU drivers/multithreaded scenarios this **crashes natively and kills the entire JVM** — leaving no Java-level trace.
 
-## 修复方式
+## How It Works
 
-BiliFix 用 Mixin 拦截 watermedia 读取 VLC 参数的入口（`JarTool.readArray`），运行时替换为安全参数：
+BiliFix uses a Mixin to intercept watermedia's argument loading entry point (`JarTool.readArray`), replacing the dangerous args at runtime:
 
-| 原参数 | 替换为（默认） |
+| Original | Replaced with (default) |
 |---|---|
-| `--avcodec-hw d3d11va,dxva2,any` | `--avcodec-hw none`（纯软解） |
+| `--avcodec-hw d3d11va,dxva2,any` | `--avcodec-hw none` (software decoding) |
 | `--vout direct3d11,glwin32,gl,any` | `--vout gl,any` |
 
-- 不修改 watermedia 的 jar 文件，纯运行时注入
-- 与 bilibili_media 自己注入 watermedia 的机制（`NetworkAPIMixin`）完全同路数，兼容性有保障
-- 代价只是视频改软解、CPU 占用略增，1080p 无压力
+- No jar patching — pure runtime injection, same mechanism bilibili_media itself uses to hook watermedia
+- Cost: video falls back to software decoding; slight CPU increase, negligible for 1080p
 
-## 配置
+## Configuration
 
-`.minecraft/config/bilifix.toml`（首次启动自动生成）：
+`.minecraft/config/bilifix.toml` (auto-generated on first launch):
 
 ```toml
-# 硬解码策略（崩溃根源就在这）：
-#   none    = 软件解码，最稳定（默认，修复崩溃）
-#   any     = VLC 自动选择硬解（可能复现崩溃）
-#   d3d11va = 强制 D3D11VA（高风险）
-#   dxva2   = 强制 DXVA2（高风险）
+# Hardware decoding strategy (this is the crash source):
+#   none    = software decoding, most stable (default, fixes the crash)
+#   any     = VLC auto-pick hardware decoding (may re-crash)
+#   d3d11va = force D3D11VA (high risk)
+#   dxva2   = force DXVA2 (high risk)
 hwDecoder = "none"
 
-# 视频输出模块（vout）：
-#   gl,any    = OpenGL 输出（默认，安全）
-#   original  = 保留 watermedia 原始参数
+# Video output module (vout):
+#   gl,any    = OpenGL output (default, safe)
+#   original  = keep watermedia's original args
 vout = "gl,any"
 
-# 日志中打印完整参数替换详情
+# Print full argument replacement details to the log
 verbose = false
 ```
 
-修改后重启游戏生效。
+Changes take effect after restarting the game.
 
-## 安装
+## Install
 
-1. 下载 `BiliFix-x.x.x.jar` 放进 `mods` 目录
-2. 需要 NeoForge 21.1（MC 1.21.1）；watermedia 2.1+（可选依赖，没有它本模组不做事）
+1. Drop `BiliFix-x.x.x.jar` into your `mods` folder
+2. Requires NeoForge 21.1 (MC 1.21.1); watermedia 2.1.x (optional dependency — BiliFix silently idles without it)
 
-## 兼容性
+## Compatibility
 
-| 组件 | 版本 |
+| Component | Version |
 |---|---|
 | Minecraft | 1.21.1 |
 | NeoForge | 21.1.x |
-| watermedia | **2.1.x**（实测 2.1.36） |
+| watermedia | **2.1.x** (tested 2.1.36) |
 | bilibili_media | 2.3 |
 
-理论上同样适用于所有用 watermedia 2.1 播放视频的场景（netmusic、waterframes 等），不限 B 站。
+Also applies to any mod playing videos through watermedia 2.1 (netmusic, waterframes, etc.), not just Bilibili.
 
-> **关于 watermedia 3.0**：3.0 是完全重构的架构（弃用内嵌 libVLC，改用 ffmpeg/WaterTx 媒体引擎），
-> 不存在本模组修复的 D3D11VA 崩溃路径，**无需也无效**。本模组只针对 watermedia 2.1.x。
+> **About watermedia 3.0**: it is a complete rewrite (embedded libVLC replaced by an ffmpeg/WaterTx engine).
+> The D3D11VA crash path this mod fixes no longer exists there — **BiliFix is neither needed nor effective for 3.0+**.
+> This mod targets watermedia 2.1.x only.
 
-## 验证修复是否生效
+## Verifying It Works
 
-启动游戏后日志中应出现：
+After launching, the log should contain:
 
 ```
-[BiliFix] v1.2.1 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] v1.3.0 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 16 项 → 新 16 项)
 ```
 
-然后播放之前必崩的视频，游戏不再退出。
+Then play the video that previously crashed the game — it should no longer exit.
 
-## 许可
+## Building From Source
+
+```powershell
+./build.ps1   # compile + run 37 regression tests + package
+```
+
+Requires a local JDK 21 (the Minecraft runtime JDK works) and the game libraries on disk.
+
+## License
 
 [MIT](LICENSE)
-
-## 致谢
-
-- 问题诊断基于社区大量"返回值 -1"崩溃报告
-- watermedia / videolan4j / libVLC 的开发者们

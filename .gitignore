@@ -1,0 +1,22 @@
+# 构建产物
+build/
+out/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.settings/
+.classpath
+.project
+bin/
+
+# 系统
+Thumbs.db
+.DS_Store
+
+# 日志与临时
+*.log
+*.tmp

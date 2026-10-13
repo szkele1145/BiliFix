@@ -1,0 +1,22 @@
+modID="bilifix"
+version="1.1.0"
+displayName="BiliFix — Bilibili Media Crash Fix"
+description='''Fixes silent JVM crashes (exit code -1) caused by watermedia/libVLC D3D11VA hardware decoding when playing Bilibili videos in modpacks. Patches VLC launch arguments at runtime: forces software decoding by default (configurable). Works with bilibili_media + watermedia + waterframes.'''
+authors="szkele1145"
+license="MIT"
+displayURL="https://github.com/szkele1145/BiliFix"
+issueTrackerURL="https://github.com/szkele1145/BiliFix/issues"
+
+[[dependencies.bilifix]]
+modId="neoforge"
+type="required"
+versionRange="[21.1,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.bilifix]]
+modId="watermedia"
+type="optional"
+versionRange="[2.1,)"
+ordering="AFTER"
+side="CLIENT"

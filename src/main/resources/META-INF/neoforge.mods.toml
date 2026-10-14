@@ -15,7 +15,7 @@ ordering="NONE"
 
 [[dependencies.bilifix]]
 modId="bilibili_media"
-type="required"
+type="optional"
 versionRange="[2.0,)"
 ordering="AFTER"
 

@@ -26,11 +26,12 @@ $mcDir = Split-Path -Parent $lib
 $ghTokenFile = Join-Path $env:USERPROFILE '.dsh\gh.token'
 $mrTokenFile = Join-Path $env:USERPROFILE '.dsh\mr.token'
 
-# ---- Read version + jar ----
+# ---- Read version + jar (naming: <mod>-<version>-mc<game>-<loader>.jar) ----
 $toml = Get-Content "$root\src\main\resources\META-INF\neoforge.mods.toml" -Raw -Encoding UTF8
 if (-not ($toml -match '(?s)\[\[mods\]\].*?version\s*=\s*"([^"]+)"')) { throw "cannot read version" }
 $version = $Matches[1]
-$jarPath = Join-Path $root "build\BiliFix-$version.jar"
+$jarName = "BiliFix-$version-mc1.21.1-neoforge.jar"
+$jarPath = Join-Path $root "build\$jarName"
 if (-not (Test-Path $jarPath)) { throw "jar not built: $jarPath (run build.ps1 first)" }
 Write-Host "Deploying BiliFix v$version  ($([Math]::Round((Get-Item $jarPath).Length/1KB,1)) KB)"
 
@@ -47,7 +48,9 @@ Write-Host "Jar integrity OK - proceeding" -ForegroundColor Green
 if ($DryRun) { Write-Host "DRY RUN - would deploy to: mods folder, GitHub Release v$version$(if ($IncludeModrinth) { ', Modrinth' }); stopping."; return }
 
 # ---- 1. Local mods folder ----
-$modsJar = Join-Path $mcDir "versions\航空学这一块\mods\BiliFix-$version.jar"
+$modsJar = Join-Path $mcDir "versions\航空学这一块\mods\$jarName"
+# remove any old-convention jar from previous deployments
+Remove-Item (Join-Path $mcDir "versions\航空学这一块\mods\BiliFix-$version.jar") -Force -ErrorAction SilentlyContinue
 Copy-Item $jarPath $modsJar -Force
 Write-Host "mods folder: deployed -> $modsJar" -ForegroundColor Green
 
@@ -61,7 +64,7 @@ if (Test-Path $ghTokenFile) {
     if ($rel) {
         foreach ($a in $rel.assets) { Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/szkele1145/BiliFix/releases/assets/$($a.id)" -Headers $h -Proxy $proxy | Out-Null }
         $jar = [System.IO.File]::ReadAllBytes($jarPath)
-        $req = [System.Net.HttpWebRequest]::Create("https://uploads.github.com/repos/szkele1145/BiliFix/releases/$($rel.id)/assets?name=BiliFix-$version.jar")
+        $req = [System.Net.HttpWebRequest]::Create("https://uploads.github.com/repos/szkele1145/BiliFix/releases/$($rel.id)/assets?name=$jarName")
         $req.Method = 'POST'
         if ($proxy) { $req.Proxy = New-Object System.Net.WebProxy($proxy) }
         $req.ContentType = 'application/java-archive'

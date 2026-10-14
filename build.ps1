@@ -105,14 +105,15 @@ Implementation-Title: BiliFix
 Implementation-Version: $version
 "@ | Out-File "$OutDir\MANIFEST.MF" -Encoding ascii
 Push-Location $stage
-& $jar cfm "$OutDir\BiliFix-$version.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json bilifix_logo.png META-INF/neoforge.mods.toml META-INF/mods.toml
+# Naming convention: <mod>-<version>-mc<gameVersion>-<loader>.jar
+& $jar cfm "$OutDir\BiliFix-$version-mc1.21.1-neoforge.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json bilifix_logo.png META-INF/neoforge.mods.toml META-INF/mods.toml
 Pop-Location
 # Post-build jar integrity check: read EVERY entry fully via .NET ZipArchive (strict path,
 # matching how FML consumes jars). Catches corrupted central directories at build time
 # instead of at game launch (see the 1.3.2 incident: "invalid entry size").
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$jarOut = "$OutDir\BiliFix-$version.jar"
+$jarOut = "$OutDir\BiliFix-$version-mc1.21.1-neoforge.jar"
 $zc = [System.IO.Compression.ZipFile]::OpenRead($jarOut)
 $failCount = 0
 foreach ($e in $zc.Entries) {

@@ -39,12 +39,19 @@ if ($wm) { $cp += ';' + $wm.FullName } else { Write-Warning 'watermedia jar not 
 
 # ---- stage patched sources ----
 $srcDir = Join-Path $root 'src\main\java'
+# Note: Forge 1.20.1 javafml requires a NO-ARG mod constructor
+# (FMLModContainer calls getDeclaredConstructor() with an empty Class array),
+# while NeoForge injects ModContainer. So besides the import swap we rewrite
+# the BiliFixMod constructor to no-arg form for the Forge variant.
 Get-ChildItem $srcDir -Recurse -Filter '*.java' | ForEach-Object {
     $rel = $_.FullName.Substring($srcDir.Length + 1)
     $dest = Join-Path "$OutDir\src" $rel
     New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
     $c = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
     $c = $c -replace 'net\.neoforged\.fml', 'net.minecraftforge.fml'
+    if ($_.Name -eq 'BiliFixMod.java') {
+        $c = $c -replace 'public BiliFixMod\(ModContainer container\)', 'public BiliFixMod()'
+    }
     [System.IO.File]::WriteAllText($dest, $c, (New-Object System.Text.UTF8Encoding($false)))
 }
 

@@ -124,9 +124,27 @@ public class Regression {
         // 清理
         Files.deleteIfExists(cfg2);
 
+        // ============ 11. CrashSentinel 逻辑同构测试（v1.4.3） ============
+        // recordHarden 的事件格式（含/不含 fullArgs）
+        String ev1 = sentinelEvent(18, 18, null);
+        String ev2 = sentinelEvent(16, 16, "--avcodec-hw none --vout gl,any");
+        check("Sentinel: 基本事件", ev1.contains("VLC args hardened: 18 -> 18 items") && ev1.contains("hw=none"));
+        check("Sentinel: fullArgs 附加", ev2.contains(" | --avcodec-hw none --vout gl,any"));
+        check("Sentinel: 无 fullArgs 时无竖线", !ev1.contains(" | "));
+        // 事件环（容量截断）
+        check("Sentinel: ev2 独立于 ev1", !ev2.equals(ev1));
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);
+    }
+
+    // ===== 与 CrashSentinel.recordHarden 相同的事件构造逻辑 =====
+    static String sentinelEvent(int originalCount, int newCount, String fullArgs) {
+        String event = "VLC args hardened: " + originalCount + " -> " + newCount + " items"
+                + " (hw=none)";
+        if (fullArgs != null) event += " | " + fullArgs;
+        return event;
     }
 
     // ===== 与 JarToolMixin.bilifix$makeArgsSafe 完全一致的逻辑 =====

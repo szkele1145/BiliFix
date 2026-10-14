@@ -40,8 +40,8 @@
 
 6. 切换几个不同视频再播（B 站普通视频 + 番剧/直播如有）
    - [ ] 不同类型视频均正常
-7. 检查 `/bilifix.toml` 已在 `.minecraft/config/` 生成
-   - [ ] 配置文件存在且可读
+7. 检查 `bilifix.toml` 已在 `.minecraft/config/` 生成
+   - [ ] 配置文件存在且可读（含 hwDecoder / vout / verbose 三项注释齐全）
 
 ## 四、结果记录
 

@@ -9,7 +9,7 @@ import java.util.List;
  * 启动环境诊断：检测与 BiliFix 相关的崩溃风险因素，输出诊断报告。
  *
  * 检测项：
- * 1. watermedia 是否在 classpath（不在则 BiliFix 处于待命状态，正常）
+ * 1. 前置链路版本感知：watermedia / bilibili_media / waterframes（FML ModList 运行时 API）
  * 2. JVM 架构与内存（32 位 JVM / 低内存也是原生崩溃风险因素）
  * 3. 操作系统版本
  * 4. GPU 型号（Windows 注册表查询；崩溃与驱动相关，帮助定位）
@@ -22,12 +22,10 @@ public final class EnvironmentDiagnostics {
             List<String> report = new ArrayList<>();
             report.add("==== BiliFix 环境诊断 ====");
 
-            // 1. watermedia 存在性 + 具体版本（反射读取，无编译期依赖）
-            boolean watermediaPresent = checkClass("org.watermedia.WaterMedia");
-            String wmVersion = watermediaVersion();
-            report.add("watermedia: " + (watermediaPresent
-                    ? "已安装 ✓" + (wmVersion != null ? "（版本 " + wmVersion + "）" : "") + "（BiliFix 正在守护）"
-                    : "未安装（BiliFix 待命，不产生任何开销）"));
+            // 1. 前置链路版本感知（FML ModList 运行时 API，统一拿任意 mod 版本）
+            report.add("watermedia: " + modLine("watermedia", "BiliFix 正在守护", "BiliFix 待命，不产生任何开销"));
+            report.add("bilibili_media: " + modLine("bilibili_media", "前置链路就绪", "未安装（B 站解析不可用，不影响 netmusic 等场景）"));
+            report.add("waterframes: " + modLine("waterframes", "播放屏幕就绪", "未安装"));
 
             // 2. Java 架构
             String arch = System.getProperty("os.arch", "unknown");
@@ -110,27 +108,27 @@ public final class EnvironmentDiagnostics {
     }
 
     /**
-     * 反射读取 watermedia 版本（避免编译期耦合；任何异常返回 null 安全降级）。
-     * 依次尝试其常 见版本字段：VERSION / version。
+     * 生成一行 mod 状态报告：通过 FML ModList 查 mod 的版本（运行时 API，统一来源）。
+     *FML 不可用时（极端早期）回退到 classpath 检测，只报存在性不报版本。
      */
-    private static String watermediaVersion() {
+    private static String modLine(String modId, String presentNote, String absentNote) {
         try {
-            Class<?> cls = Class.forName("org.watermedia.WaterMedia", false,
-                    EnvironmentDiagnostics.class.getClassLoader());
-            for (String field : new String[]{"VERSION", "version"}) {
-                try {
-                    var f = cls.getDeclaredField(field);
-                    f.setAccessible(true);
-                    if (f.getType() == String.class) {
-                        Object v = f.get(null);
-                        if (v instanceof String s && !s.isBlank()) return s;
-                    }
-                } catch (NoSuchFieldException ignored) {
-                }
+            var mi = net.neoforged.fml.ModList.get().getModFileById(modId);
+            if (mi != null) {
+                String ver = mi.versionString();
+                return "已安装 ✓" + (ver != null && !ver.isBlank() ? "（版本 " + ver + "）" : "") + "（" + presentNote + "）";
             }
         } catch (Throwable ignored) {
-            // 反射失败（任何原因）都静默——版本显示是锦上添花
+            // ModList 不可用时回退 classpath 检测
         }
-        return null;
+        // 回退：classpath 探测常见入口类
+        String probe = switch (modId) {
+            case "watermedia" -> "org.watermedia.WaterMedia";
+            case "bilibili_media" -> "dev.polaris_light.bilibili_media.BiliBiliMedia";
+            case "waterframes" -> "me.srrapero720.waterframes.WaterFrames";
+            default -> null;
+        };
+        if (probe != null && checkClass(probe)) return "已安装（版本未知）（" + presentNote + "）";
+        return absentNote;
     }
 }

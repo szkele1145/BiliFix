@@ -101,4 +101,26 @@ MixinConfigs: bilifix.mixins.json
 Push-Location $stage
 & $jar cfm "$OutDir\BiliFix-$version.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json META-INF/neoforge.mods.toml
 Pop-Location
-Write-Host "Packaged: $OutDir\BiliFix-$version.jar ($((Get-Item "$OutDir\BiliFix-$version.jar").Length) bytes)" -ForegroundColor Green
+# Post-build jar integrity check: read EVERY entry fully via .NET ZipArchive (strict path,
+# matching how FML consumes jars). Catches corrupted central directories at build time
+# instead of at game launch (see the 1.3.2 incident: "invalid entry size").
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$jarOut = "$OutDir\BiliFix-$version.jar"
+$zc = [System.IO.Compression.ZipFile]::OpenRead($jarOut)
+$failCount = 0
+foreach ($e in $zc.Entries) {
+    try {
+        $ms = New-Object System.IO.MemoryStream
+        $e.Open().CopyTo($ms)
+        if ($ms.Length -ne $e.Length) { $failCount++; Write-Host "  BAD entry size: $($e.FullName) declared=$($e.Length) actual=$($ms.Length)" -ForegroundColor Red }
+    } catch {
+        $failCount++
+        Write-Host "  UNREADABLE entry: $($e.FullName) - $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+$total = $zc.Entries.Count
+$zc.Dispose()
+if ($failCount -gt 0) { throw "jar integrity check FAILED: $failCount of $total entries corrupt" }
+Write-Host "Jar integrity: $total/$total entries OK" -ForegroundColor Green
+Write-Host "Packaged: $jarOut ($((Get-Item $jarOut).Length) bytes)" -ForegroundColor Green

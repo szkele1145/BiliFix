@@ -1,4 +1,20 @@
 # Changelog
+## 1.4.3 — 2026-10-15
+
+### 新增
+- `verbose = true` 时 CrashSentinel 把完整 VLC 参数序列写进诊断文件（完整记录 VLC 实际收到的内容）
+- CrashSentinel 事件格式补 4 项测试（43 → 47）
+
+## 1.4.2 — 2026-10-15
+
+### 新增
+- 前置链路版本感知：通过 FML ModList 运行时 API 统一报出 watermedia / bilibili_media / waterframes 版本
+- FML 不可用时回退 classpath 探测（报存在性不报版本）
+
+## 1.4.1 — 2026-10-15
+
+### 新增
+- 启动诊断报出 watermedia 精确版本号（反射读取 VERSION 字段，零编译耦合）
 
 ## 1.4.0 — 2026-10-14
 

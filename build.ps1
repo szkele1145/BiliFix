@@ -50,9 +50,9 @@ if (-not $WatermediaJar) {
 }
 if (-not (Test-Path $WatermediaJar)) { Write-Warning "watermedia jar not found - compile continues (@Pseudo target missing is only a warning)" }
 
-# Version (read from mods.toml)
+# Version (read from mods.toml - FML structure: version = "x" inside [[mods]])
 $toml = Get-Content "$root\src\main\resources\META-INF\neoforge.mods.toml" -Raw -Encoding UTF8
-if ($toml -match 'version="([^"]+)"') { $version = $Matches[1] } else { throw "cannot read version from mods.toml" }
+if ($toml -match '(?s)\[\[mods\]\].*?version\s*=\s*"([^"]+)"') { $version = $Matches[1] } else { throw "cannot read version from mods.toml" }
 Write-Host "Building BiliFix v$version"
 
 # Classpath
@@ -92,6 +92,7 @@ $stage = "$OutDir\jar"
 Copy-Item "$OutDir\classes\dev" "$stage\dev" -Recurse -Force
 Copy-Item "$root\src\main\resources\bilifix.mixins.json" "$stage\" -Force
 Copy-Item "$root\src\main\resources\META-INF\neoforge.mods.toml" "$stage\META-INF\" -Force
+Copy-Item "$root\src\main\resources\META-INF\mods.toml" "$stage\META-INF\" -Force
 @"
 Manifest-Version: 1.0
 Implementation-Title: BiliFix
@@ -99,7 +100,7 @@ Implementation-Version: $version
 MixinConfigs: bilifix.mixins.json
 "@ | Out-File "$OutDir\MANIFEST.MF" -Encoding ascii
 Push-Location $stage
-& $jar cfm "$OutDir\BiliFix-$version.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json META-INF/neoforge.mods.toml
+& $jar cfm "$OutDir\BiliFix-$version.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json META-INF/neoforge.mods.toml META-INF/mods.toml
 Pop-Location
 # Post-build jar integrity check: read EVERY entry fully via .NET ZipArchive (strict path,
 # matching how FML consumes jars). Catches corrupted central directories at build time

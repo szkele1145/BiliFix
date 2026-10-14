@@ -22,3 +22,11 @@ BiliFix 的修复机制（Mixin 注入 watermedia 自己的 JarTool 类）不依
 ## 建议
 先等 NeoForge 1.21.1 在真实游戏里验证修复有效，再考虑扩展。
 若社区有 Fabric/Forge 需求（issue 反馈），按上面清单逐个适配。
+
+## 补充验证（2026-10-14 上午）
+
+**Forge 变体已确认极低成本**：代码差异仅 3 处 import 包名替换
+（`net.neoforged.fml.ModContainer` / `net.neoforged.fml.common.Mod` /
+`net.neoforged.fml.loading.FMLPaths` → `net.minecraftforge.*` 等价物），
+核心逻辑（Mixin、配置、诊断）零改动。若用户或社区提出需求，
+当天即可产出 Forge 变体（mods.toml + 换包名编译）。

@@ -1,4 +1,15 @@
 # Changelog
+
+## Forge 1.20.1 变体（开发中，未随主线版本发布）
+
+### 2026-10-15 凌晨
+- `build-forge.ps1`：同一份源码产出 Forge 1.20.1 变体 jar（`BiliFix-<版本>-mc1.20.1-forge.jar`）
+- 适配三个加载器机制差异（详见 docs/cross-loader-research.md）：
+  1. mixin 注册：Forge 1.20.1 无 `[[mixins]]` toml 支持 → MANIFEST `MixinConfigs`
+  2. 依赖语法：`type="required/optional"` → `mandatory=true/false`
+  3. 构造器：Forge javafml 只接受无参构造（字节码查证）→ 自动重写并清理无用 import
+- 状态：编译级验证完成（15/15 条目自检），**待真实 Forge 1.20.1 实例运行时验证后发布**
+
 ## 1.4.3 — 2026-10-15
 
 ### 新增

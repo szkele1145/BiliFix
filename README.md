@@ -2,6 +2,7 @@
 
 **Fixes the silent JVM crash (exit code -1) caused by watermedia/libVLC D3D11VA hardware decoding when playing Bilibili videos in Minecraft modpacks.**
 
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/bilifix)](https://modrinth.com/mod/bilifix)
 [![Modrinth](https://img.shields.io/badge/Modrinth-available-brightgreen)](https://modrinth.com/mod/bilifix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-blue)](https://github.com/szkele1145/BiliFix/releases)

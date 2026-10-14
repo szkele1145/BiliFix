@@ -2,6 +2,7 @@
 
 **修复整合包播放 B 站视频时游戏无声崩溃（退出码 -1、无任何 Java 崩溃堆栈）的问题。**
 
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/bilifix)](https://modrinth.com/mod/bilifix)
 [![Modrinth](https://img.shields.io/badge/Modrinth-available-brightgreen)](https://modrinth.com/mod/bilifix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-blue)](https://github.com/szkele1145/BiliFix/releases)

@@ -97,6 +97,11 @@ verbose = false
 
 然后播放之前必崩的视频，游戏不再退出。
 
+> **早期 1.3.2 下载者注意**：曾短暂发布过两个有缺陷的 1.3.2 构建
+> （zip 元数据损坏 / mods.toml 结构错误——游戏启动时报 *"invalid entry size"* 或
+> *"Missing ModLoader"*）。已在数小时内全部替换；如遇到任一报错，请**重新下载 1.3.2**。
+> 完整复盘见 [docs/postmortem-1.3.2.md](docs/postmortem-1.3.2.md)。
+
 ## 从源码构建
 
 ```powershell

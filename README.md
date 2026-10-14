@@ -97,6 +97,12 @@ After launching, the log should contain:
 
 Then play the video that previously crashed the game — it should no longer exit.
 
+> **Note for early 1.3.2 downloads**: two defective 1.3.2 builds were briefly
+> published (corrupted zip metadata / wrong mods.toml structure — the game failed
+> at startup with *"invalid entry size"* or *"Missing ModLoader"*). Both were
+> replaced within hours; if you hit either error, **re-download 1.3.2**.
+> See [docs/postmortem-1.3.2.md](docs/postmortem-1.3.2.md) for the full story.
+
 ## Building From Source
 
 ```powershell

@@ -30,3 +30,12 @@ BiliFix 的修复机制（Mixin 注入 watermedia 自己的 JarTool 类）不依
 `net.neoforged.fml.loading.FMLPaths` → `net.minecraftforge.*` 等价物），
 核心逻辑（Mixin、配置、诊断）零改动。若用户或社区提出需求，
 当天即可产出 Forge 变体（mods.toml + 换包名编译）。
+
+## Forge 1.20.1 变体：已构建（2026-10-15 凌晨）
+
+`build-forge.ps1` 已产出 `BiliFix-1.4.3-mc1.20.1-forge.jar`（15/15 条目自检通过）：
+- 同源码，3 处 import 替换（net.neoforged.fml -> net.minecraftforge.fml）+ Forge 版 mods.toml
+- Forge FML 依赖按需自动下载（fmlcore/javafmllanguage/fmlloader/forgespi，URL 实测有效）
+- **状态：编译级验证完成，未做运行时实测**——v1.3.2 的教训（编译通过≠游戏能加载），
+  需在真实 Forge 1.20.1 实例启动确认后再对外发布。
+  （本机的 shwetro-1201 开发环境正好是 Forge 1.20.1，可作实测场）

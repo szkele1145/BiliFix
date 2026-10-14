@@ -96,6 +96,7 @@ if (Test-Path "$root\src\test\java\Regression.java") {
 $stage = "$OutDir\jar"
 Copy-Item "$OutDir\classes\dev" "$stage\dev" -Recurse -Force
 Copy-Item "$root\src\main\resources\bilifix.mixins.json" "$stage\" -Force
+Copy-Item "$root\src\main\resources\bilifix_logo.png" "$stage\" -Force
 Copy-Item "$root\src\main\resources\META-INF\neoforge.mods.toml" "$stage\META-INF\" -Force
 Copy-Item "$root\src\main\resources\META-INF\mods.toml" "$stage\META-INF\" -Force
 @"
@@ -104,7 +105,7 @@ Implementation-Title: BiliFix
 Implementation-Version: $version
 "@ | Out-File "$OutDir\MANIFEST.MF" -Encoding ascii
 Push-Location $stage
-& $jar cfm "$OutDir\BiliFix-$version.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json META-INF/neoforge.mods.toml META-INF/mods.toml
+& $jar cfm "$OutDir\BiliFix-$version.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json bilifix_logo.png META-INF/neoforge.mods.toml META-INF/mods.toml
 Pop-Location
 # Post-build jar integrity check: read EVERY entry fully via .NET ZipArchive (strict path,
 # matching how FML consumes jars). Catches corrupted central directories at build time

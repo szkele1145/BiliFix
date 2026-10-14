@@ -1,6 +1,11 @@
 ﻿# Build script (PowerShell, Windows)
 # Requires: local Minecraft runtime JDK (javac/jar), NeoForge 21.1 libs, mixin 0.8.5, watermedia jar
 # Usage: ./build.ps1 [-WatermediaJar <path>] [-OutDir <dir>]
+#
+# Test coverage note: the regression tests cover ARG REPLACEMENT + CONFIG PARSING logic only.
+# They do NOT cover jar packaging or mods.toml structure - the two areas that caused the
+# v1.3.2 incidents. Those are guarded by the post-build jar integrity check and the
+# FML structure precheck list (docs/postmortem-1.3.2.md). Keep all three layers green.
 
 param(
     [string]$WatermediaJar = "",

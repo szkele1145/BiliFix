@@ -21,10 +21,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * shutdown hook 里把 BiliFix 的运行状态（加固参数、Mixin 应用次数、
  * 生命周期事件）写入 <code>bilifix-diagnostic.txt</code>：</p>
  * <ul>
- *   <li><b>正常退出</b>（用户关游戏）：文件记录"clean exit"，覆盖上次的崩溃快照</li>
- *   <li><b>异常退出</b>（崩溃后 hook 仍有机会运行的场景）：文件保留崩溃前状态，
- *       用户下次崩溃报告时附上即可加速定位</li>
- *   <li><b>硬性原生崩溃</b>（hook 完全没机会）：文件停留在上次会话内容——
+ *   <li><b>正常退出</b>（用户关游戏）：文件记录本次状态，覆盖上次的崩溃快照</li>
+ *   <li><b>Java 层异常退出</b>（FML 报错走 System.exit——如 v1.3.2 的
+ *       "invalid entry size"/"Missing ModLoader" 类加载失败）：hook 照常运行，
+ *       文件保留崩溃前状态</li>
+ *   <li><b>硬性原生崩溃</b>（native 直接 abort，hook 无机会）：文件停留在上次会话——
  *       "文件时间戳早于崩溃时间"本身就是有价值的排查信息</li>
  * </ul>
  *

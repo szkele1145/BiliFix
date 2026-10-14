@@ -66,6 +66,16 @@ verbose = false
 
 Changes take effect after restarting the game.
 
+## Crash Diagnostic Guardian (v1.4.0+)
+
+On game exit, BiliFix writes its runtime state to `bilifix-diagnostic.txt` in the
+game directory (hardening count, strategy, lifecycle events; the full hardened VLC
+arg sequence too when `verbose = true`). If the silent crash ever recurs, this file
+is the last Java-side evidence — attach it to your crash report.
+
+The startup diagnostics also report the exact companion-chain versions
+(watermedia / bilibili_media / waterframes).
+
 ## Install
 
 1. Drop `BiliFix-x.x.x-mc1.21.1-neoforge.jar` into your `mods` folder

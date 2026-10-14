@@ -65,6 +65,14 @@ verbose = false
 
 修改后重启游戏生效。
 
+## 崩溃诊断守护（v1.4.0+）
+
+游戏退出时，BiliFix 会把运行状态写入游戏目录的 `bilifix-diagnostic.txt`
+（加固次数、策略、生命周期事件；`verbose = true` 时含完整 VLC 参数序列）。
+如果无声崩溃复发，这个文件是 Java 侧留下的最后证据——把它附在崩溃报告里。
+
+启动日志的诊断区还会报出前置链路的精确版本（watermedia / bilibili_media / waterframes）。
+
 ## 安装
 
 1. 下载 `BiliFix-x.x.x-mc1.21.1-neoforge.jar` 放进 `mods` 目录

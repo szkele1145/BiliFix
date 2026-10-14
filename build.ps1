@@ -102,7 +102,6 @@ Copy-Item "$root\src\main\resources\META-INF\mods.toml" "$stage\META-INF\" -Forc
 Manifest-Version: 1.0
 Implementation-Title: BiliFix
 Implementation-Version: $version
-MixinConfigs: bilifix.mixins.json
 "@ | Out-File "$OutDir\MANIFEST.MF" -Encoding ascii
 Push-Location $stage
 & $jar cfm "$OutDir\BiliFix-$version.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json META-INF/neoforge.mods.toml META-INF/mods.toml

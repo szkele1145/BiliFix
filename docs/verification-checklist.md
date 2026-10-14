@@ -6,7 +6,7 @@
 > **前置链路**：哔哩哔哩WaterMedia兼容模组（bilibili_media，Modrinth: bilibilimedia）
 > + watermedia 2.1.x + waterframes —— 本模组修复的正是这条 B 站视频播放链。
 
-## 一、启动验证（1 分钟）
+## 一、启动验证（1 分钟）✅ 已通过（2026-10-14 16:39 会话日志确认）
 
 1. 启动 PCL → 启动"航空学这一块"
 2. 打开日志（PCL 的日志页或 `logs/latest.log`），确认以下三行存在：
@@ -17,8 +17,8 @@
    [BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
    ```
 
-   - [ ] 启动日志三行齐全
-   - [ ] 无 BiliFix 相关报错
+   - [x] 启动日志三行齐全（16:40:26 全部出现）
+   - [x] 无 BiliFix 相关报错（15 分钟稳定运行，16:54 正常退出，watermedia 正常 shutdown）
 
    **若"环境诊断"里 GPU 行显示你的真实显卡型号（如 NVIDIA/AMD/Intel）→ GPU 检测工作正常**
 
@@ -29,10 +29,11 @@
 5. 播放期间确认另一行日志：
 
    ```
-   [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 16 项 → 新 16 项)
+   [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
    ```
+   （已在 16:40:24 的启动日志中确认出现 ✓）
 
-   - [ ] 播放时出现"参数已加固"日志
+   - [x] 播放时出现"参数已加固"日志（16:40:24 已确认，18 项全加固）
    - [ ] 视频正常播放（画面 + 声音）
    - [ ] **播放 5 分钟以上游戏不退出**（之前 3 分钟内必崩）
 

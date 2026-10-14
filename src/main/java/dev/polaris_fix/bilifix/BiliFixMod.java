@@ -24,11 +24,14 @@ import org.slf4j.LoggerFactory;
  * </ul></p>
  *
  * <p>配置：.minecraft/config/bilifix.toml（hwDecoder / vout / verbose），修改后重启游戏生效。</p>
+ *
+ * <p>v1.4.0：新增崩溃诊断守护（CrashSentinel）——JVM 退出时把修复运行状态
+ * 写入游戏目录 bilifix-diagnostic.txt，为无声崩溃留下 Java 侧的最后线索。</p>
  */
 @Mod(BiliFixMod.MOD_ID)
 public class BiliFixMod {
     public static final String MOD_ID = "bilifix";
-    public static final String VERSION = "1.3.2";
+    public static final String VERSION = "1.4.0";
     public static final Logger LOGGER = LoggerFactory.getLogger("BiliFix");
 
     public BiliFixMod(ModContainer container) {
@@ -36,5 +39,7 @@ public class BiliFixMod {
         LOGGER.info("[BiliFix] v{} 已加载：watermedia VLC 硬解崩溃修复（策略: hw={}, vout={}）",
                 VERSION, BiliFixConfig.hwDecoder, BiliFixConfig.vout);
         EnvironmentDiagnostics.run(LOGGER);
+        CrashSentinel.register();
+        CrashSentinel.record("mod constructed, v" + VERSION);
     }
 }

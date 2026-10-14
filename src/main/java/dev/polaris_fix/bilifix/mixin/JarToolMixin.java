@@ -109,6 +109,8 @@ public class JarToolMixin {
             BiliFixMod.LOGGER.info("[BiliFix] VLC 参数已加固: --avcodec-hw={} , --vout={} (原 {} 项 → 新 {} 项)",
                     hw, vout == null ? "(保留原值)" : vout, original.length, fixed.size());
         }
+        // 上报给崩溃诊断守护（v1.4.0）：无声崩溃时留下一份"修复确实生效过"的证据
+        dev.polaris_fix.bilifix.CrashSentinel.recordHarden(original.length, fixed.size());
         cir.setReturnValue(fixed.toArray(new String[0]));
     }
 

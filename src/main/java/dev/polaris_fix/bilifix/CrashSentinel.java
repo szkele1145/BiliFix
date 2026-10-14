@@ -44,11 +44,13 @@ public final class CrashSentinel {
 
     private CrashSentinel() {}
 
-    /** 记录一次 Mixin 参数加固 */
-    public static void recordHarden(int originalCount, int newCount) {
+    /** 记录一次 Mixin 参数加固（fullArgs 非空时附带完整参数序列） */
+    public static void recordHarden(int originalCount, int newCount, String fullArgs) {
         HARDEN_COUNT.incrementAndGet();
-        record("VLC args hardened: " + originalCount + " -> " + newCount + " items"
-                + " (hw=" + BiliFixConfig.hwDecoderValue() + ")");
+        String event = "VLC args hardened: " + originalCount + " -> " + newCount + " items"
+                + " (hw=" + BiliFixConfig.hwDecoderValue() + ")";
+        if (fullArgs != null) event += " | " + fullArgs;
+        record(event);
     }
 
     /** 记录生命周期事件（超过上限时丢弃最旧的） */

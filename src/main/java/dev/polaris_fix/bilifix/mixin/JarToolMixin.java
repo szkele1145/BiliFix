@@ -110,7 +110,9 @@ public class JarToolMixin {
                     hw, vout == null ? "(保留原值)" : vout, original.length, fixed.size());
         }
         // 上报给崩溃诊断守护（v1.4.0）：无声崩溃时留下一份"修复确实生效过"的证据
-        dev.polaris_fix.bilifix.CrashSentinel.recordHarden(original.length, fixed.size());
+        // （verbose 配置时附带完整参数序列，进诊断文件）
+        dev.polaris_fix.bilifix.CrashSentinel.recordHarden(original.length, fixed.size(),
+                BiliFixConfig.verbose ? String.join(" ", fixed) : null);
         cir.setReturnValue(fixed.toArray(new String[0]));
     }
 

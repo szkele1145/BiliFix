@@ -67,7 +67,7 @@ verbose = false
 
 ## 安装
 
-1. 下载 `BiliFix-x.x.x.jar` 放进 `mods` 目录
+1. 下载 `BiliFix-x.x.x-mc1.21.1-neoforge.jar` 放进 `mods` 目录
 2. 需要 NeoForge 21.1（MC 1.21.1）；watermedia 2.1+（可选依赖，没有它本模组不做事）
 3. **前置建议**：[哔哩哔哩WaterMedia兼容模组（BiliBiliMedia）](https://modrinth.com/mod/bilibilimedia)——本模组修复的主要场景就是它的 B 站视频播放链路
 

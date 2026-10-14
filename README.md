@@ -68,7 +68,7 @@ Changes take effect after restarting the game.
 
 ## Install
 
-1. Drop `BiliFix-x.x.x.jar` into your `mods` folder
+1. Drop `BiliFix-x.x.x-mc1.21.1-neoforge.jar` into your `mods` folder
 2. Requires NeoForge 21.1 (MC 1.21.1); watermedia 2.1.x (optional dependency — BiliFix silently idles without it)
 3. **Recommended companion**: [BiliBiliMedia](https://modrinth.com/mod/bilibilimedia) — the Bilibili playback chain this mod primarily fixes
 

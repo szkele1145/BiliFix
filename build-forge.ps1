@@ -48,12 +48,21 @@ Get-ChildItem $srcDir -Recurse -Filter '*.java' | ForEach-Object {
     [System.IO.File]::WriteAllText($dest, $c, (New-Object System.Text.UTF8Encoding($false)))
 }
 
-# ---- Forge-flavored mods.toml (loaderVersion for Forge 47) ----
+# ---- Forge-flavored mods.toml ----
+# Per the official Forge 1.20.1 docs (docs.minecraftforge.net/en/1.20.1/gettingstarted/modfiles):
+#  - NO [[mixins]] block support (that's NeoForge-only) -> mixin config goes via
+#    MANIFEST MixinConfigs instead
+#  - dependency field is `mandatory=true`, NOT `type="required"`
 $toml = Get-Content (Join-Path $root 'src\main\resources\META-INF\neoforge.mods.toml') -Raw -Encoding UTF8
 $toml = $toml -replace 'loaderVersion = "\[4,\)"', 'loaderVersion = "[47,)"'
 $toml = $toml -replace 'versionRange = "\[21,\)"', 'versionRange = "[47,)"'   # neoforge dep
 $toml = $toml -replace 'modId = "neoforge"', 'modId = "forge"'
 $toml = $toml -replace 'versionRange = "\[1\.21\.1,\)"', 'versionRange = "[1.20.1,)"'  # minecraft dep
+# NeoForge [[mixins]] block is NOT supported by Forge 1.20.1 FML - strip it
+$toml = $toml -replace '(?ms)\[\[mixins\]\]\s*\r?\nconfig\s*=\s*"[^"]+"\s*\r?\n', ''
+# NeoForge `type = "required"/"optional"` -> Forge `mandatory = true/false`
+$toml = $toml -replace 'type = "required"', 'mandatory = true'
+$toml = $toml -replace 'type = "optional"', 'mandatory = false'
 $ver = [regex]::Match($toml, '(?s)\[\[mods\]\].*?version\s*=\s*"([^"]+)"').Groups[1].Value
 $jarName = "BiliFix-$ver-mc1.20.1-forge.jar"
 
@@ -65,15 +74,18 @@ Write-Host 'Compile OK (Forge, --release 17)' -ForegroundColor Green
 
 # ---- package ----
 $stage = "$OutDir\jar"
+# clean staging to prevent nested-copy duplication (dev/dev/... incident)
+Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path "$stage\META-INF" | Out-Null
 Copy-Item "$OutDir\classes\dev" "$stage\dev" -Recurse -Force
 Copy-Item (Join-Path $root 'src\main\resources\bilifix.mixins.json') "$stage\" -Force
 Copy-Item (Join-Path $root 'src\main\resources\bilifix_logo.png') "$stage\" -Force
-[void][System.IO.Directory]::CreateDirectory("$stage\META-INF")
 [System.IO.File]::WriteAllText("$stage\META-INF\mods.toml", $toml, (New-Object System.Text.UTF8Encoding($false)))
 @"
 Manifest-Version: 1.0
 Implementation-Title: BiliFix
 Implementation-Version: $ver
+MixinConfigs: bilifix.mixins.json
 "@ | Out-File "$OutDir\MANIFEST.MF" -Encoding ascii
 Push-Location $stage
 & $jar cfm "$OutDir\$jarName" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json bilifix_logo.png META-INF/mods.toml

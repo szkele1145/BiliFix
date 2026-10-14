@@ -2,6 +2,9 @@
 
 > BiliFix v1.3.2 已部署在 `D:\PCL2\.minecraft\versions\航空学这一块\mods\`，
 > 启动游戏即可开始验证。
+> 
+> **前置链路**：哔哩哔哩WaterMedia兼容模组（bilibili_media，Modrinth: bilibilimedia）
+> + watermedia 2.1.x + waterframes —— 本模组修复的正是这条 B 站视频播放链。
 
 ## 一、启动验证（1 分钟）
 

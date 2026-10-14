@@ -39,3 +39,18 @@ BiliFix 的修复机制（Mixin 注入 watermedia 自己的 JarTool 类）不依
 - **状态：编译级验证完成，未做运行时实测**——v1.3.2 的教训（编译通过≠游戏能加载），
   需在真实 Forge 1.20.1 实例启动确认后再对外发布。
   （本机的 shwetro-1201 开发环境正好是 Forge 1.20.1，可作实测场）
+## Forge 1.20.1 实测前的机制差异全记录（2026-10-15 凌晨，字节码/官方文档级查证）
+
+除 3 处 import 替换外，还发现并适配了三个会导致加载失败的机制差异：
+
+1. **mixin 注册渠道**：Forge 1.20.1 FML 不认 mods.toml 的 `[[mixins]]` 块（NeoForge 专属）
+   → Forge 变体剥离该块，改用 MANIFEST `MixinConfigs`（两个加载器机制正好相反）
+   来源：docs.minecraftforge.net/en/1.20.1/gettingstarted/modfiles（完整字段表中无 mixins）
+2. **依赖字段语法**：Forge 用 `mandatory=true/false`，NeoForge 用 `type="required"/"optional"`
+   → 构建时正则转换
+3. **mod 构造器签名**：Forge 1.20.1 FMLModContainer 以空参数数组调 getDeclaredConstructor
+   （字节码证据），只接受无参构造器；NeoForge 注入 ModContainer
+   → 构建时把 BiliFixMod(ModContainer) 重写为 BiliFixMod() 并删除无用 import
+
+"编译通过 ≠ 运行正确"的三个活例。每个差异都靠官方文档或字节码级查证发现，
+而非等真实实例崩溃。

@@ -5,7 +5,7 @@ issueTrackerURL = "https://github.com/szkele1145/BiliFix/issues"
 
 [[mods]]
 modId = "bilifix"
-version = "1.4.0"
+version = "1.4.1"
 displayName = "BiliFix - Bilibili Media Crash Fix"
 displayURL = "https://github.com/szkele1145/BiliFix"
 authors = "szkele1145"

@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 @Mod(BiliFixMod.MOD_ID)
 public class BiliFixMod {
     public static final String MOD_ID = "bilifix";
-    public static final String VERSION = "1.4.0";
+    public static final String VERSION = "1.4.1";
     public static final Logger LOGGER = LoggerFactory.getLogger("BiliFix");
 
     public BiliFixMod(ModContainer container) {

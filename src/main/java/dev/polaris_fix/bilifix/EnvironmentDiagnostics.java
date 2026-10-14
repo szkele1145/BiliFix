@@ -22,10 +22,11 @@ public final class EnvironmentDiagnostics {
             List<String> report = new ArrayList<>();
             report.add("==== BiliFix 环境诊断 ====");
 
-            // 1. watermedia 存在性
+            // 1. watermedia 存在性 + 具体版本（反射读取，无编译期依赖）
             boolean watermediaPresent = checkClass("org.watermedia.WaterMedia");
+            String wmVersion = watermediaVersion();
             report.add("watermedia: " + (watermediaPresent
-                    ? "已安装 ✓（BiliFix 正在守护）"
+                    ? "已安装 ✓" + (wmVersion != null ? "（版本 " + wmVersion + "）" : "") + "（BiliFix 正在守护）"
                     : "未安装（BiliFix 待命，不产生任何开销）"));
 
             // 2. Java 架构
@@ -106,5 +107,30 @@ public final class EnvironmentDiagnostics {
         } catch (ClassNotFoundException e) {
             return false;
         }
+    }
+
+    /**
+     * 反射读取 watermedia 版本（避免编译期耦合；任何异常返回 null 安全降级）。
+     * 依次尝试其常 见版本字段：VERSION / version。
+     */
+    private static String watermediaVersion() {
+        try {
+            Class<?> cls = Class.forName("org.watermedia.WaterMedia", false,
+                    EnvironmentDiagnostics.class.getClassLoader());
+            for (String field : new String[]{"VERSION", "version"}) {
+                try {
+                    var f = cls.getDeclaredField(field);
+                    f.setAccessible(true);
+                    if (f.getType() == String.class) {
+                        Object v = f.get(null);
+                        if (v instanceof String s && !s.isBlank()) return s;
+                    }
+                } catch (NoSuchFieldException ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+            // 反射失败（任何原因）都静默——版本显示是锦上添花
+        }
+        return null;
     }
 }

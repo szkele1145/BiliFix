@@ -14,6 +14,12 @@ versionRange="[21.1,)"
 ordering="NONE"
 
 [[dependencies.bilifix]]
+modId="bilibili_media"
+type="required"
+versionRange="[2.0,)"
+ordering="AFTER"
+
+[[dependencies.bilifix]]
 modId="watermedia"
 type="optional"
 versionRange="[2.1,)"

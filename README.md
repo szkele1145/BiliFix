@@ -1,4 +1,4 @@
-# BiliFix
+﻿# BiliFix
 
 **Fixes the silent JVM crash (exit code -1) caused by watermedia/libVLC D3D11VA hardware decoding when playing Bilibili videos in Minecraft modpacks.**
 
@@ -117,13 +117,21 @@ Then play the video that previously crashed the game — it should no longer exi
 ## Building From Source
 
 ```powershell
-./build.ps1   # compile + run 43 regression tests + package
+./build.ps1   # compile + run 51 regression tests + package
 ```
 
 The script auto-detects the JDK 21 (Minecraft runtime works) and the game
 libraries folder. Overrides: `BILIFIX_JAVAC=<javac path>`, `BILIFIX_LIBS=<libraries dir>`,
 `-WatermediaJar <path>`.
 
+## Documentation
+
+- [CHANGELOG.md](CHANGELOG.md) - every release and what changed
+- [CONTRIBUTING.md](CONTRIBUTING.md) - project layout and the change checklist
+- [docs/ROADMAP.md](docs/ROADMAP.md) - status of every workstream
+- [docs/verification-checklist.md](docs/verification-checklist.md) - how the fix is verified
+- [docs/cross-loader-research.md](docs/cross-loader-research.md) - the loader matrix
+- [docs/postmortem-1.3.2.md](docs/postmortem-1.3.2.md) - the two startup-failure incidents
 ## License
 
 [MIT](LICENSE)

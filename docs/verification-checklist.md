@@ -1,7 +1,7 @@
 # 游戏内验证清单（用户醒来后按此执行）
 
-> BiliFix v1.4.4 已部署在 `D:\PCL2\.minecraft\versions\航空学这一块\mods\`，
-> 启动游戏即可开始验证。
+> BiliFix v1.4.6 已部署在 `D:\PCL2\.minecraft\versions\航空学这一块\mods\`
+> （`BiliFix-1.4.6-mc1.21.1-neoforge.jar`），启动游戏即可开始验证。
 > 
 > **前置链路**：哔哩哔哩WaterMedia兼容模组（bilibili_media，Modrinth: bilibilimedia）
 > + watermedia 2.1.x + waterframes —— 本模组修复的正是这条 B 站视频播放链。
@@ -12,10 +12,12 @@
 2. 打开日志（PCL 的日志页或 `logs/latest.log`），确认以下三行存在：
 
    ```
-   [BiliFix] v1.4.4 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+   [BiliFix] v1.4.6 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
    [BiliFix] ==== BiliFix 环境诊断 ====
    [BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
    ```
+
+   > 上面是**行格式**示例（版本号随 jar 变化，以你实际部署的为准）。
 
    - [x] 启动日志三行齐全（16:40:26 全部出现）
    - [x] 无 BiliFix 相关报错（15 分钟稳定运行，16:54 正常退出，watermedia 正常 shutdown）
@@ -36,7 +38,8 @@
    - [x] 播放时出现"参数已加固"日志（16:40:24 已确认，18 项全加固）
 
    > **端到端审计证据（16:40:25）**：watermedia 日志打印的 VLC 实际参数序列：
-   > --vout, gl,any + --avcodec-hw, none`n   > ——BiliFix 的替换项已真实送达 libVLC，其余参数原样保留。链路全环节日志实证。
+   > `--vout, gl,any` + `--avcodec-hw, none`
+   > ——BiliFix 的替换项已真实送达 libVLC，其余参数原样保留。链路全环节日志实证。
    - [ ] 视频正常播放（画面 + 声音）
    - [ ] **播放 5 分钟以上游戏不退出**（之前 3 分钟内必崩）
 

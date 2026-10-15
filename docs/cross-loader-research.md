@@ -1,4 +1,4 @@
-# 跨加载器支持调研（2026-10-14 凌晨，待与项目所有者确认）
+﻿# 跨加载器支持调研（2026-10-14 凌晨，待与项目所有者确认）
 
 ## 背景
 watermedia 2.1.x（libVLC 时代）支持：MC 1.16.5 / 1.18.2 / 1.19.2 / 1.20.1 / 1.21.1 / 1.21.5 × fabric / forge / neoforge。
@@ -55,6 +55,7 @@ BiliFix 的修复机制（Mixin 注入 watermedia 自己的 JarTool 类）不依
 
 "编译通过 ≠ 运行正确"的三个活例。每个差异都靠官方文档或字节码级查证发现，
 而非等真实实例崩溃。
+
 ## 版本矩阵调研（2026-10-15 早）
 
 字节码对比 Forge 1.18.2 (40.2.21) 与 1.20.1 (47.3.0) 的 FMLModContainer：
@@ -65,6 +66,7 @@ BiliFix 的修复机制（Mixin 注入 watermedia 自己的 JarTool 类）不依
 forge universal jar 内）——若要支持 1.16.5 需从 universal jar 提取或用完整 forge dev 环境验证；
 1.19.2/1.20.1/1.21.5 依官方 Forge 惯例预计同型（javafml 机制在这几个版本间无大改），
 待逐版字节码确认后再扩发布面。
+
 ## Mixin 目标的版本稳定性确认（2026-10-15 早）
 
 watermedia 2.1.37 是**单一通用 jar**（同一文件覆盖 1.16.5–1.21.5 × fabric/forge/neoforge，

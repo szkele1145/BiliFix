@@ -132,6 +132,7 @@ libraries folder. Overrides: `BILIFIX_JAVAC=<javac path>`, `BILIFIX_LIBS=<librar
 - [docs/verification-checklist.md](docs/verification-checklist.md) - how the fix is verified
 - [docs/cross-loader-research.md](docs/cross-loader-research.md) - the loader matrix
 - [docs/postmortem-1.3.2.md](docs/postmortem-1.3.2.md) - the two startup-failure incidents
+
 ## License
 
 [MIT](LICENSE)

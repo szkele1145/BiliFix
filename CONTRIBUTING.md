@@ -13,7 +13,7 @@ failures degrade silently (warnings at most), never escalate to load errors.
 ```powershell
 git clone https://github.com/szkele1145/BiliFix
 cd BiliFix
-./build.ps1        # compile + 51 regression tests + jar integrity check
+./build.ps1        # compile + 66 regression tests + jar integrity check
 ```
 
 Requirements: any JDK 21 (the build auto-detects `.tools\jdk21`, the MC runtime, or PATH).
@@ -30,7 +30,7 @@ src/main/java/dev/polaris_fix/bilifix/
 src/main/resources/
   META-INF/neoforge.mods.toml  # FML metadata (also copied to mods.toml)
   bilifix.mixins.json          # mixin config (@Pseudo, defaultRequire=0)
-src/test/java/Regression.java # 51 assertions, mirrors production logic 1:1
+src/test/java/Regression.java # 66 assertions, mirrors production logic 1:1
 build.ps1          # build + test + package + integrity gate
 build-forge.ps1    # Forge 1.20.1 variant (same sources, see docs/cross-loader-research.md)
 deploy.ps1         # local mods + GitHub asset sync

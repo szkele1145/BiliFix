@@ -26,16 +26,16 @@ if ($env:BILIFIX_JAVAC) {
     if ($fromPath) { $javac = $fromPath.Source }
 }
 if (-not $javac) {
-    # Probe common Minecraft runtime JDK locations (PCL / vanilla launcher layouts)
+    # Probe order: project toolchain JDK > MC runtime (may be a trimmed JRE) > user JDKs
     $home2 = $env:USERPROFILE
     $candidates = @(
-        "$env:APPDATA\.minecraft\runtime\java-runtime-delta\bin\javac.exe",
-        "$home2\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\javac.exe",
+        "$root\.tools\jdk21\bin\javac.exe",                                  # project toolchain (full JDK 21)
+        "$env:APPDATA\.minecraft\runtime\java-runtime-delta\bin\javac.exe",  # MC runtime (trimmed to JRE by PCL updates)
         "C:\Users\一只屑\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\javac.exe"
     )
     foreach ($c in $candidates) { if (Test-Path $c) { $javac = $c; break } }
 }
-if (-not $javac) { throw "javac not found. Set BILIFIX_JAVAC=<path to javac.exe> or add a JDK 21 to PATH" }
+if (-not $javac) { throw "javac not found. Set BILIFIX_JAVAC=<path to javac.exe>, place a JDK 21 in .tools\jdk21, or add one to PATH" }
 $jdkBin = Split-Path -Parent $javac
 $jar = Join-Path $jdkBin 'jar.exe'
 $javaExe = Join-Path $jdkBin 'java.exe'

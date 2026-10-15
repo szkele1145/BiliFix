@@ -10,7 +10,13 @@ $root = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvoca
 $OutDir = Join-Path $root 'build\forge'
 $javac = $env:BILIFIX_JAVAC
 if (-not $javac) { $t = Get-Command javac -ErrorAction SilentlyContinue; if ($t) { $javac = $t.Source } }
-if (-not $javac) { $javac = 'C:\Users\一只屑\AppData\Roaming\.minecraft\runtime\java-runtime-delta\bin\javac.exe' }
+if (-not $javac) {
+    # MC runtime is a trimmed JRE (no javac) - probe local JDKs instead
+    foreach ($probe in @("$env:USERPROFILE\.jdks\ms-17.0.19\bin\javac.exe", 'C:\jdk17\bin\javac.exe')) {
+        if (Test-Path $probe) { $javac = $probe; break }
+    }
+}
+if (-not $javac) { throw 'no JDK found: set BILIFIX_JAVAC or install one (.jdks/ms-17.0.19 expected for --release 17)' }
 $jar = $javac -replace 'javac\.exe$', 'jar.exe'
 
 # Forge 1.20.1 deps (downloaded on demand into build\forge\libs)

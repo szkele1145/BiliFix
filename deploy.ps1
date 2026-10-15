@@ -48,11 +48,16 @@ Write-Host "Jar integrity OK - proceeding" -ForegroundColor Green
 if ($DryRun) { Write-Host "DRY RUN - would deploy to: mods folder, GitHub Release v$version$(if ($IncludeModrinth) { ', Modrinth' }); stopping."; return }
 
 # ---- 1. Local mods folder ----
-$modsJar = Join-Path $mcDir "versions\航空学这一块\mods\$jarName"
-# remove any old-convention jar from previous deployments
-Remove-Item (Join-Path $mcDir "versions\航空学这一块\mods\BiliFix-$version.jar") -Force -ErrorAction SilentlyContinue
+# Instance dir override: BILIFIX_INSTANCE=<full path to the version instance dir>; default the known pack
+$instanceDir = $env:BILIFIX_INSTANCE
+if (-not $instanceDir) { $instanceDir = Join-Path $mcDir 'versions\航空学这一块' }
+$modsDir = Join-Path $instanceDir 'mods'
+New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
+# remove ALL previous BiliFix jars (any version / naming convention) to keep the mods dir clean
+Remove-Item (Join-Path $modsDir 'BiliFix-*.jar') -Force -ErrorAction SilentlyContinue
+$modsJar = Join-Path $modsDir $jarName
 Copy-Item $jarPath $modsJar -Force
-Write-Host "mods folder: deployed -> $modsJar" -ForegroundColor Green
+Write-Host "mods folder: deployed -> $modsJar (older BiliFix jars removed)" -ForegroundColor Green
 
 # ---- 2. GitHub Release asset refresh ----
 if (Test-Path $ghTokenFile) {
@@ -79,12 +84,12 @@ if (Test-Path $ghTokenFile) {
     } else { Write-Warning "no GitHub Release tag v$version found - skipped" }
 } else { Write-Warning "$ghTokenFile not found - GitHub sync skipped" }
 
-# ---- 3. Modrinth version replace (opt-in; deletes + re-uploads) ----
+# ---- 3. Modrinth ----
+# NOTE: Modrinth uploads are handled by pending-modrinth.ps1 (token-gated batch uploader).
+# -IncludeModrinth is intentionally NOT implemented here: deleting/re-uploading versions
+# affects the review queue (see docs/postmortem-1.3.2.md) and stays an explicit, separate step.
 if ($IncludeModrinth) {
-    if (-not (Test-Path $mrTokenFile)) { Write-Warning "$mrTokenFile not found - Modrinth sync skipped"; return }
-    $mrToken = (Get-Content $mrTokenFile -Raw).Trim()
-    Write-Warning "Modrinth replacement requires interactive confirmation (delete+upload may affect review queue)."
-    Write-Host "Run the Modrinth steps manually when needed; this path is intentionally not automated yet."
+    Write-Host "Modrinth is handled by pending-modrinth.ps1 (run it separately after placing a fresh token)." -ForegroundColor Yellow
 }
 
 Write-Host "Deploy complete." -ForegroundColor Green

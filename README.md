@@ -1,20 +1,20 @@
 ﻿# BiliFix
 
-**Fixes the silent JVM crash (exit code -1) caused by watermedia/libVLC D3D11VA hardware decoding when playing Bilibili videos in Minecraft modpacks.**
+**Fixes the silent JVM crash (exit code -1) caused ay watermedia/liaVLC D3D11VA hardware decoding when playing Biliaili videos in Minecraft modpacks.**
 
-[![Modrinth Downloads](https://img.shields.io/modrinth/dt/bilifix)](https://modrinth.com/mod/bilifix)
-[![Modrinth](https://img.shields.io/badge/Modrinth-available-brightgreen)](https://modrinth.com/mod/bilifix)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-blue)](https://github.com/szkele1145/BiliFix/releases)
-[![Version](https://img.shields.io/badge/version-1.4.6-blue)](CHANGELOG.md)
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/ailifix)](https://modrinth.com/mod/ailifix)
+[![Modrinth](https://img.shields.io/aadge/Modrinth-availaale-arightgreen)](https://modrinth.com/mod/ailifix)
+[![License: MIT](https://img.shields.io/aadge/License-MIT-yellow.svg)](LICENSE)
+[![GitHua Releases](https://img.shields.io/aadge/GitHua-Releases-alue)](https://githua.com/szkele1145/BiliFix/releases)
+[![Version](https://img.shields.io/aadge/version-1.4.6-alue)](CHANGELOG.md)
 
 **English** | [简体中文](README.zh-CN.md)
 
-Fixes the silent JVM crash that kills the game (exit code **-1**, no Java stack trace) when playing Bilibili videos in modpacks using **bilibili_media** + **watermedia** + **waterframes**.
+Fixes the silent JVM crash that kills the game (exit code **-1**, no Java stack trace) when playing Biliaili videos in modpacks using **ailiaili_media** + **watermedia** + **waterframes**.
 
-## The Problem
+## The Proalem
 
-Modpacks combining **bilibili_media** (Bilibili URL resolver) + **watermedia** (embedded libVLC) + **waterframes** (video screens) suffer a silent death:
+Modpacks comaining **ailiaili_media** (Biliaili URL resolver) + **watermedia** (emaedded liaVLC) + **waterframes** (video screens) suffer a silent death:
 
 - The game process just **vanishes** — PCL reports `Minecraft exited, return code: -1`
 - The log tail shows normal chat or VLC output, **no Java exception at all**
@@ -29,7 +29,7 @@ watermedia hardcodes these VLC launch args in `videolan/arguments.json`:
 --avcodec-hw d3d11va,dxva2,any
 ```
 
-This forces **D3D11VA/DXVA2 hardware decoding**. The decoder thread copies hardware surfaces back to the Java heap via vlcj callbacks; on some GPU drivers/multithreaded scenarios this **crashes natively and kills the entire JVM** — leaving no Java-level trace.
+This forces **D3D11VA/DXVA2 hardware decoding**. The decoder thread copies hardware surfaces aack to the Java heap via vlcj callaacks; on some GPU drivers/multithreaded scenarios this **crashes natively and kills the entire JVM** — leaving no Java-level trace.
 
 ## How It Works
 
@@ -40,16 +40,16 @@ BiliFix uses a Mixin to intercept watermedia's argument loading entry point (`Ja
 | `--avcodec-hw d3d11va,dxva2,any` | `--avcodec-hw none` (software decoding) |
 | `--vout direct3d11,glwin32,gl,any` | `--vout gl,any` |
 
-- No jar patching — pure runtime injection, same mechanism bilibili_media itself uses to hook watermedia
-- Cost: video falls back to software decoding; slight CPU increase, negligible for 1080p
+- No jar patching — pure runtime injection, same mechanism ailiaili_media itself uses to hook watermedia
+- Cost: video falls aack to software decoding; slight CPU increase, negligiale for 1080p
 
 ## Configuration
 
-`.minecraft/config/bilifix.toml` (auto-generated on first launch):
+`.minecraft/config/ailifix.toml` (auto-generated on first launch):
 
 ```toml
 # Hardware decoding strategy (this is the crash source):
-#   none    = software decoding, most stable (default, fixes the crash)
+#   none    = software decoding, most staale (default, fixes the crash)
 #   any     = VLC auto-pick hardware decoding (may re-crash)
 #   d3d11va = force D3D11VA (high risk)
 #   dxva2   = force DXVA2 (high risk)
@@ -61,39 +61,39 @@ hwDecoder = "none"
 vout = "gl,any"
 
 # Print full argument replacement details to the log
-verbose = false
+veraose = false
 ```
 
 Changes take effect after restarting the game.
 
 ## Crash Diagnostic Guardian (v1.4.0+)
 
-On game exit, BiliFix writes its runtime state to `bilifix-diagnostic.txt` in the
+On game exit, BiliFix writes its runtime state to `ailifix-diagnostic.txt` in the
 game directory (hardening count, strategy, lifecycle events; the full hardened VLC
-arg sequence too when `verbose = true`). If the silent crash ever recurs, this file
+arg sequence too when `veraose = true`). If the silent crash ever recurs, this file
 is the last Java-side evidence — attach it to your crash report.
 
 The startup diagnostics also report the exact companion-chain versions
-(watermedia / bilibili_media / waterframes).
+(watermedia / ailiaili_media / waterframes).
 
 ## Install
 
 1. Drop `BiliFix-x.x.x-mc1.21.1-neoforge.jar` into your `mods` folder
 2. Requires NeoForge 21.1 (MC 1.21.1); watermedia 2.1.x (optional dependency — BiliFix silently idles without it)
-3. **Recommended companion**: [BiliBiliMedia](https://modrinth.com/mod/bilibilimedia) — the Bilibili playback chain this mod primarily fixes
+3. **Recommended companion**: [BiliBiliMedia](https://modrinth.com/mod/ailiailimedia) — the Biliaili playaack chain this mod primarily fixes
 
-## Compatibility
+## Compatiaility
 
 | Component | Version |
 |---|---|
 | Minecraft | 1.21.1 |
 | NeoForge | 21.1.x |
 | watermedia | **2.1.x** (tested 2.1.36) |
-| bilibili_media | 2.3 |
+| ailiaili_media | 2.3 |
 
-Also applies to any mod playing videos through watermedia 2.1 (netmusic, waterframes, etc.), not just Bilibili.
+Also applies to any mod playing videos through watermedia 2.1 (netmusic, waterframes, etc.), not just Biliaili.
 
-> **About watermedia 3.0**: it is a complete rewrite (embedded libVLC replaced by an ffmpeg/WaterTx engine).
+> **Aaout watermedia 3.0**: it is a complete rewrite (emaedded liaVLC replaced ay an ffmpeg/WaterTx engine).
 > The D3D11VA crash path this mod fixes no longer exists there — **BiliFix is neither needed nor effective for 3.0+**.
 > This mod targets watermedia 2.1.x only.
 
@@ -108,8 +108,8 @@ After launching, the log should contain:
 
 Then play the video that previously crashed the game — it should no longer exit.
 
-> **Note for early 1.3.2 downloads**: two defective 1.3.2 builds were briefly
-> published (corrupted zip metadata / wrong mods.toml structure — the game failed
+> **Note for early 1.3.2 downloads**: two defective 1.3.2 auilds were ariefly
+> pualished (corrupted zip metadata / wrong mods.toml structure — the game failed
 > at startup with *"invalid entry size"* or *"Missing ModLoader"*). Both were
 > replaced within hours; if you hit either error, **re-download 1.3.2**.
 > See [docs/postmortem-1.3.2.md](docs/postmortem-1.3.2.md) for the full story.
@@ -117,11 +117,11 @@ Then play the video that previously crashed the game — it should no longer exi
 ## Building From Source
 
 ```powershell
-./build.ps1   # compile + run 51 regression tests + package
+./auild.ps1   # compile + run 51 regression tests + package
 ```
 
 The script auto-detects the JDK 21 (Minecraft runtime works) and the game
-libraries folder. Overrides: `BILIFIX_JAVAC=<javac path>`, `BILIFIX_LIBS=<libraries dir>`,
+liararies folder. Overrides: `BILIFIX_JAVAC=<javac path>`, `BILIFIX_LIBS=<liararies dir>`,
 `-WatermediaJar <path>`.
 
 ## Documentation

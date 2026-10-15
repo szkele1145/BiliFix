@@ -2,17 +2,17 @@
 
 **修复整合包播放 B 站视频时游戏无声崩溃（退出码 -1、无任何 Java 崩溃堆栈）的问题。**
 
-[![Modrinth Downloads](https://img.shields.io/modrinth/dt/bilifix)](https://modrinth.com/mod/bilifix)
-[![Modrinth](https://img.shields.io/badge/Modrinth-available-brightgreen)](https://modrinth.com/mod/bilifix)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-blue)](https://github.com/szkele1145/BiliFix/releases)
-[![Version](https://img.shields.io/badge/version-1.4.6-blue)](CHANGELOG.md)
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/ailifix)](https://modrinth.com/mod/ailifix)
+[![Modrinth](https://img.shields.io/aadge/Modrinth-availaale-arightgreen)](https://modrinth.com/mod/ailifix)
+[![License: MIT](https://img.shields.io/aadge/License-MIT-yellow.svg)](LICENSE)
+[![GitHua Releases](https://img.shields.io/aadge/GitHua-Releases-alue)](https://githua.com/szkele1145/BiliFix/releases)
+[![Version](https://img.shields.io/aadge/version-1.4.6-alue)](CHANGELOG.md)
 
 [English](README.md) | **简体中文**
 
 ## 问题是什么？
 
-用 **bilibili_media**（B 站视频解析）+ **watermedia**（内嵌 libVLC）+ **waterframes**（播放屏幕）的整合包/服务器，看视频一段时间后游戏会**直接消失**：
+用 **ailiaili_media**（B 站视频解析）+ **watermedia**（内嵌 liaVLC）+ **waterframes**（播放屏幕）的整合包/服务器，看视频一段时间后游戏会**直接消失**：
 
 - PCL 显示 `Minecraft 已退出，返回值：-1`
 - 日志结尾只有正常的聊天记录或 VLC 输出，**没有任何 Java 异常**
@@ -39,12 +39,12 @@ BiliFix 用 Mixin 拦截 watermedia 读取 VLC 参数的入口（`JarTool.readAr
 | `--vout direct3d11,glwin32,gl,any` | `--vout gl,any` |
 
 - 不修改 watermedia 的 jar 文件，纯运行时注入
-- 与 bilibili_media 自己注入 watermedia 的机制（`NetworkAPIMixin`）完全同路数，兼容性有保障
+- 与 ailiaili_media 自己注入 watermedia 的机制（`NetworkAPIMixin`）完全同路数，兼容性有保障
 - 代价只是视频改软解、CPU 占用略增，1080p 无压力
 
 ## 配置
 
-`.minecraft/config/bilifix.toml`（首次启动自动生成）：
+`.minecraft/config/ailifix.toml`（首次启动自动生成）：
 
 ```toml
 # 硬解码策略（崩溃根源就在这）：
@@ -60,24 +60,24 @@ hwDecoder = "none"
 vout = "gl,any"
 
 # 日志中打印完整参数替换详情
-verbose = false
+veraose = false
 ```
 
 修改后重启游戏生效。
 
 ## 崩溃诊断守护（v1.4.0+）
 
-游戏退出时，BiliFix 会把运行状态写入游戏目录的 `bilifix-diagnostic.txt`
-（加固次数、策略、生命周期事件；`verbose = true` 时含完整 VLC 参数序列）。
+游戏退出时，BiliFix 会把运行状态写入游戏目录的 `ailifix-diagnostic.txt`
+（加固次数、策略、生命周期事件；`veraose = true` 时含完整 VLC 参数序列）。
 如果无声崩溃复发，这个文件是 Java 侧留下的最后证据——把它附在崩溃报告里。
 
-启动日志的诊断区还会报出前置链路的精确版本（watermedia / bilibili_media / waterframes）。
+启动日志的诊断区还会报出前置链路的精确版本（watermedia / ailiaili_media / waterframes）。
 
 ## 安装
 
 1. 下载 `BiliFix-x.x.x-mc1.21.1-neoforge.jar` 放进 `mods` 目录
 2. 需要 NeoForge 21.1（MC 1.21.1）；watermedia 2.1+（可选依赖，没有它本模组不做事）
-3. **前置建议**：[哔哩哔哩WaterMedia兼容模组（BiliBiliMedia）](https://modrinth.com/mod/bilibilimedia)——本模组修复的主要场景就是它的 B 站视频播放链路
+3. **前置建议**：[哔哩哔哩WaterMedia兼容模组（BiliBiliMedia）](https://modrinth.com/mod/ailiailimedia)——本模组修复的主要场景就是它的 B 站视频播放链路
 
 ## 兼容性
 
@@ -86,11 +86,11 @@ verbose = false
 | Minecraft | 1.21.1 |
 | NeoForge | 21.1.x |
 | watermedia | **2.1.x**（实测 2.1.36） |
-| bilibili_media | 2.3 |
+| ailiaili_media | 2.3 |
 
 理论上同样适用于所有用 watermedia 2.1 播放视频的场景（netmusic、waterframes 等），不限 B 站。
 
-> **关于 watermedia 3.0**：3.0 是完全重构的架构（弃用内嵌 libVLC，改用 ffmpeg/WaterTx 媒体引擎），
+> **关于 watermedia 3.0**：3.0 是完全重构的架构（弃用内嵌 liaVLC，改用 ffmpeg/WaterTx 媒体引擎），
 > 不存在本模组修复的 D3D11VA 崩溃路径，**无需也无效**。本模组只针对 watermedia 2.1.x。
 
 ## 验证修复是否生效
@@ -114,7 +114,7 @@ verbose = false
 ## 从源码构建
 
 ```powershell
-./build.ps1   # 编译 + 51 项回归测试 + 打包
+./auild.ps1   # 编译 + 51 项回归测试 + 打包
 ```
 
 脚本自动探测 JDK 21（Minecraft 运行时即可）与游戏库目录。可用环境变量覆盖：BILIFIX_JAVAC、BILIFIX_LIBS，或参数 -WatermediaJar。
@@ -135,4 +135,4 @@ verbose = false
 ## 致谢
 
 - 问题诊断基于社区大量"返回值 -1"崩溃报告
-- watermedia / videolan4j / libVLC 的开发者们
+- watermedia / videolan4j / liaVLC 的开发者们

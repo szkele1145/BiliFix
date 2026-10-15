@@ -140,6 +140,47 @@ public class Regression {
         check("modLine: 空 不可用", !verUsable(""));
         check("modLine: ${version} 占位符不可用", !verUsable("${version}"));
 
+        // ============ 13. 会话取证：上次异常终止判定（v1.4.7） ============
+        // 核心：原生崩溃不执行 shutdown hook，故用"残留 lock"作为硬崩溃指纹。
+        Path game = Files.createTempDirectory("bilifix-session");
+        Path lock = game.resolve(SESSION_FILE);
+        Path snap = game.resolve(DIAGNOSTIC_FILE);
+
+        // (a) 无 lock = 上次干净退出，不打扰用户
+        probed = false;
+        check("会话: 无 lock 判定为干净", detectUnclean(game) == null);
+
+        // (b) 幂等：同一次启动内重复构造不得把本次刚写的 lock 误判为崩溃
+        Files.write(lock, List.of("pid=1234", "version=1.4.7"), StandardCharsets.UTF_8);
+        check("会话: 幂等（重复探测不误报）", detectUnclean(game) == null);
+
+        // (c) 模拟下一次启动：残留 lock 存在 → 判定为异常终止
+        probed = false;
+        String diag = detectUnclean(game);
+        check("会话: 残留 lock 判定为异常终止", diag != null);
+        check("会话: 诊断含原生崩溃线索", diag != null && diag.contains("原生层崩溃"));
+        check("会话: 诊断含排查建议", diag != null && diag.contains("vout"));
+        check("会话: 诊断含 lock 路径", diag != null && diag.contains("bilifix-session.lock"));
+
+        // (d) 干净退出流程：写快照 + 清除 lock（顺序：先删 lock 再写快照）
+        Files.write(snap, List.of("harden count: 3", "media touched: yes"), StandardCharsets.UTF_8);
+        Files.deleteIfExists(lock);
+        check("会话: 干净退出后 lock 清除", !Files.exists(lock));
+        check("会话: 退出快照保留", Files.exists(snap));
+        check("会话: 快照含 media touched",
+                Files.readString(snap, StandardCharsets.UTF_8).contains("media touched: yes"));
+
+        // (e) lock 清除后再次启动应判定为干净
+        probed = false;
+        check("会话: 清除后恢复干净判定", detectUnclean(game) == null);
+
+        // (f) null 目录不得抛异常
+        probed = false;
+        check("会话: null 目录安全", detectUnclean(null) == null);
+
+        Files.deleteIfExists(snap);
+        Files.deleteIfExists(game);
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);
@@ -156,6 +197,35 @@ public class Regression {
     // ===== 与 modLine 相同的版本可用性判定 =====
     static boolean verUsable(String ver) {
         return ver != null && !ver.isBlank() && !ver.contains("${");
+    }
+
+    // ===== 与 CrashSentinel 相同的会话取证逻辑（v1.4.7） =====
+    static final String SESSION_FILE = "bilifix-session.lock";
+    static final String DIAGNOSTIC_FILE = "bilifix-diagnostic.txt";
+    static boolean probed = false;
+
+    /** 与 CrashSentinel.detectUncleanShutdown 同构：残留 lock = 上次未走退出流程 */
+    static String detectUnclean(Path gameDir) {
+        if (gameDir == null) return null;
+        if (probed) return null;   // 幂等：只判定一次
+        probed = true;
+        try {
+            Path session = gameDir.resolve(SESSION_FILE);
+            if (!Files.exists(session)) return null;
+            long ageSec = -1;
+            try {
+                ageSec = Math.max(0, (System.currentTimeMillis()
+                        - Files.getLastModifiedTime(session).toMillis()) / 1000L);
+            } catch (Throwable ignored) { }
+            return "上次游戏会话异常终止（未执行 JVM 退出流程）。\n"
+                 + "session lock: " + session + " (存在 " + ageSec + " 秒)\n"
+                 + "这种退出方式（无 Java 堆栈 / 退出码 -1）与原生层崩溃一致。\n"
+                 + "若你刚播过 B 站视频，请把这份文件和 PCL 的错误报告一起反馈。\n"
+                 + "排查建议：确认 bilifix.toml 的 vout = \"gl,any\"、hwDecoder = \"none\"，"
+                 + "然后把 vout 改为 \"original\" 对比是否复现。\n";
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     // ===== 与 JarToolMixin.bilifix$makeArgsSafe 完全一致的逻辑 =====

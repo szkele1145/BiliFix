@@ -6,6 +6,8 @@ import net.neoforged.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
+
 /**
  * BiliFix —— watermedia/libVLC 崩溃修复模组
  *
@@ -27,11 +29,16 @@ import org.slf4j.LoggerFactory;
  *
  * <p>v1.4.0：新增崩溃诊断守护（CrashSentinel）——JVM 退出时把修复运行状态
  * 写入游戏目录 bilifix-diagnostic.txt，为无声崩溃留下 Java 侧的最后线索。</p>
+ *
+ * <p>v1.4.7：新增会话取证。原生崩溃<b>不会执行 shutdown hook</b>，所以单靠
+ * 退出时写文件无法区分"干净退出"与"被原生层打死"。现在启动时留
+ * bilifix-session.lock、干净退出时删除；下次启动若发现残留 lock，即判定
+ * 上次为异常终止（原生崩溃指纹）并在日志中给出针对性排查建议。</p>
  */
 @Mod(BiliFixMod.MOD_ID)
 public class BiliFixMod {
     public static final String MOD_ID = "bilifix";
-    public static final String VERSION = "1.4.6";
+    public static final String VERSION = "1.4.7";
     public static final Logger LOGGER = LoggerFactory.getLogger("BiliFix");
 
     public BiliFixMod(ModContainer container) {
@@ -39,7 +46,19 @@ public class BiliFixMod {
         LOGGER.info("[BiliFix] v{} 已加载：watermedia VLC 硬解崩溃修复（策略: hw={}, vout={}）",
                 VERSION, BiliFixConfig.hwDecoder, BiliFixConfig.vout);
         EnvironmentDiagnostics.run(LOGGER);
+        // 顺序关键：先检测上次是否异常终止（残留 lock），再注册本次的守护
+        Path gameDir;
+        try {
+            gameDir = net.neoforged.fml.loading.FMLPaths.GAMEDIR.get();
+        } catch (Throwable t) {
+            gameDir = null;
+        }
+        if (gameDir != null) {
+            String crash = CrashSentinel.detectUncleanShutdown(gameDir);
+            if (crash != null) LOGGER.warn("[BiliFix] {}", crash);
+        }
         CrashSentinel.register();
+        CrashSentinel.markSessionStart(gameDir);
         CrashSentinel.record("mod constructed, v" + VERSION);
     }
 }

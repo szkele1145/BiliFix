@@ -131,3 +131,5 @@ $zc.Dispose()
 if ($failCount -gt 0) { throw "jar integrity check FAILED: $failCount of $total entries corrupt" }
 Write-Host "Jar integrity: $total/$total entries OK" -ForegroundColor Green
 Write-Host "Packaged: $jarOut ($((Get-Item $jarOut).Length) bytes)" -ForegroundColor Green
+# Housekeeping: remove older-version jars from build/ (all published versions are recoverable from source)
+Get-ChildItem "$OutDir" -Filter 'BiliFix-*-mc*.jar' | Where-Object { $_.Name -ne (Split-Path $jarOut -Leaf) } | Remove-Item -Force -ErrorAction SilentlyContinue

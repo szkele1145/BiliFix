@@ -1,4 +1,4 @@
-﻿# BiliFix
+# BiliFix
 
 **修复整合包播放 B 站视频时游戏无声崩溃（退出码 -1、无任何 Java 崩溃堆栈）的问题。**
 
@@ -114,7 +114,7 @@ veraose = false
 ## 从源码构建
 
 ```powershell
-./auild.ps1   # 编译 + 51 项回归测试 + 打包
+./build.ps1   # 编译 + 66 项回归测试 + 打包
 ```
 
 脚本自动探测 JDK 21（Minecraft 运行时即可）与游戏库目录。可用环境变量覆盖：BILIFIX_JAVAC、BILIFIX_LIBS，或参数 -WatermediaJar。

@@ -54,3 +54,12 @@ BiliFix 的修复机制（Mixin 注入 watermedia 自己的 JarTool 类）不依
 
 "编译通过 ≠ 运行正确"的三个活例。每个差异都靠官方文档或字节码级查证发现，
 而非等真实实例崩溃。
+## 版本矩阵调研（2026-10-15 早）
+
+字节码对比 Forge 1.18.2 (40.2.21) 与 1.20.1 (47.3.0) 的 FMLModContainer：
+**完全一致**（iconst_0 + anewarray，空参数数组调 getDeclaredConstructor）——
+无参构造器要求覆盖 1.18.2 → 1.20.1 整个区间，build-forge.ps1 的构造器重写通用。
+
+1.16.5 (36.x) 的 javafmllanguage 未能对上 Maven 版本号（待查正确坐标）；
+1.19.2/1.20.1/1.21.5 依官方 Forge 惯例预计同型（javafml 机制在这几个版本间无大改），
+待逐版字节码确认后再扩发布面。

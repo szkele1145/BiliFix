@@ -55,6 +55,10 @@ $modsDir = Join-Path $instanceDir 'mods'
 New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
 # remove ALL previous BiliFix jars (any version / naming convention) to keep the mods dir clean
 Remove-Item (Join-Path $modsDir 'BiliFix-*.jar') -Force -ErrorAction SilentlyContinue
+# leftover check: if the game is running and locked a jar, old ones may survive removal -
+# that would cause a duplicate-modid warning in FML. Warn loudly instead of failing silently.
+$leftovers = Get-ChildItem $modsDir -Filter 'BiliFix-*.jar' -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $jarName }
+if ($leftovers) { Write-Warning "game may be running - could not remove: $($leftovers.Name -join ', ')" }
 $modsJar = Join-Path $modsDir $jarName
 Copy-Item $jarPath $modsJar -Force
 Write-Host "mods folder: deployed -> $modsJar (older BiliFix jars removed)" -ForegroundColor Green

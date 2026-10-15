@@ -24,7 +24,8 @@ try {
 # ---- pending versions: (number, changelog, featured) ----
 $pending = @(
     @{ ver = '1.4.2'; changelog = "Diagnostics now report the full companion-chain versions: watermedia, bilibili_media, and waterframes - all read from the FML ModList runtime API (single source of truth, with a classpath-probe fallback)."; featured = $false },
-    @{ ver = '1.4.3'; changelog = "CrashSentinel now captures the full hardened VLC arg sequence when verbose=true is set in the config - the diagnostic file becomes a complete record of what VLC actually received."; featured = $true }
+    @{ ver = '1.4.3'; changelog = "CrashSentinel now captures the full hardened VLC arg sequence when verbose=true is set in the config - the diagnostic file becomes a complete record of what VLC actually received."; featured = $false },
+    @{ ver = '1.4.4'; changelog = "Fix: companion-version diagnostics reject unreplaced placeholder tokens some mods ship in their mods.toml. Also: displayTest=IGNORE_SERVER_VERSION (no server mismatch warning for a client-side fix mod). Tests: 51/51."; featured = $true }
 )
 
 foreach ($p in $pending) {

@@ -68,8 +68,15 @@ if (Test-Path $ghTokenFile) {
     $ghToken = (Get-Content $ghTokenFile -Raw).Trim()
     $proxy = $env:HTTPS_PROXY
     $h = @{ Authorization = "Bearer $ghToken"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'BiliFix-Deploy' }
-    $rels = Invoke-RestMethod -Uri 'https://api.github.com/repos/szkele1145/BiliFix/releases' -Headers $h -Proxy $proxy
-    $rel = $rels | Where-Object { $_.tag_name -eq "v$version" }
+    # Retry loop: a Release created seconds ago may not be in the list API yet (seen twice in practice)
+    $rel = $null
+    foreach ($attempt in 1..5) {
+        $rels = Invoke-RestMethod -Uri 'https://api.github.com/repos/szkele1145/BiliFix/releases' -Headers $h -Proxy $proxy
+        $rel = $rels | Where-Object { $_.tag_name -eq "v$version" }
+        if ($rel) { break }
+        Write-Host "  Release v$version not visible yet (attempt $attempt), waiting..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 5
+    }
     if ($rel) {
         foreach ($a in $rel.assets) { Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/szkele1145/BiliFix/releases/assets/$($a.id)" -Headers $h -Proxy $proxy | Out-Null }
         $jar = [System.IO.File]::ReadAllBytes($jarPath)

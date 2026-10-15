@@ -22,11 +22,34 @@ try {
 }
 
 # ---- pending versions: (number, changelog, featured) ----
-$pending = @(
-    @{ ver = '1.4.2'; changelog = "Diagnostics now report the full companion-chain versions: watermedia, bilibili_media, and waterframes - all read from the FML ModList runtime API (single source of truth, with a classpath-probe fallback)."; featured = $false },
-    @{ ver = '1.4.3'; changelog = "CrashSentinel now captures the full hardened VLC arg sequence when verbose=true is set in the config - the diagnostic file becomes a complete record of what VLC actually received."; featured = $false },
-    @{ ver = '1.4.4'; changelog = "Fix: companion-version diagnostics reject unreplaced placeholder tokens some mods ship in their mods.toml. Also: displayTest=IGNORE_SERVER_VERSION (no server mismatch warning for a client-side fix mod). Tests: 51/51."; featured = $true }
-)
+# MANUAL LIST below is used when present; otherwise the script AUTO-DISCOVERS
+# jars in build\ that are not yet on Modrinth (changelog defaults to the GH Release body).
+$manualPending = @(
+    @{ ver = ''; changelog = ''; featured = $false }
+) | Where-Object { $_.ver }
+
+# Fetch existing Modrinth versions once
+$existing = Invoke-RestMethod -Uri "https://api.modrinth.com/v2/project/$projectId/version" -Headers @{ Authorization = $mrToken } -Proxy $proxy
+$existingNums = $existing | ForEach-Object { $_.version_number }
+
+if ($manualPending) {
+    $pending = $manualPending
+} else {
+    # auto-discover: every BiliFix-*-mc1.21.1-neoforge.jar in build\ missing from Modrinth
+    $ghTokenFile = Join-Path $env:USERPROFILE '.dsh\gh.token'
+    $ghToken = if (Test-Path $ghTokenFile) { (Get-Content $ghTokenFile -Raw).Trim() }
+    $ghRels = if ($ghToken) { Invoke-RestMethod -Uri 'https://api.github.com/repos/szkele1145/BiliFix/releases' -Headers @{ Authorization = "Bearer $ghToken"; 'User-Agent' = 'BiliFix' } -Proxy $proxy }
+    $pending = Get-ChildItem (Join-Path $root 'build') -Filter 'BiliFix-*-mc1.21.1-neoforge.jar' -ErrorAction SilentlyContinue | ForEach-Object {
+        $ver = ($_.BaseName -replace '^BiliFix-|-mc1\.21\.1-neoforge$', '')
+        if ($ver -and ($existingNums -notcontains $ver)) {
+            $rel = $ghRels | Where-Object { $_.tag_name -eq "v$ver" }
+            $body = if ($rel) { ($rel.body -split "`n" | Where-Object { $_ -notmatch '^#' -and $_.Trim() }) -join ' ' } else { "See the GitHub release notes for v$ver." }
+            @{ ver = $ver; changelog = $body; featured = $false }
+        }
+    }
+}
+
+if (-not $pending) { Write-Host 'Nothing pending - Modrinth is up to date with build\.' -ForegroundColor Green; return }
 
 foreach ($p in $pending) {
     $jarName = "BiliFix-$($p.ver)-mc1.21.1-neoforge.jar"
@@ -34,8 +57,7 @@ foreach ($p in $pending) {
     if (-not (Test-Path $jarPath)) { Write-Warning "$jarName not in build/ - skipping"; continue }
 
     # skip if already uploaded
-    $v = Invoke-RestMethod -Uri "https://api.modrinth.com/v2/project/$projectId/version" -Headers @{ Authorization = $mrToken } -Proxy $proxy
-    if ($v | Where-Object { $_.version_number -eq $p.ver }) { Write-Host "$($p.ver): already on Modrinth - skip" -ForegroundColor Yellow; continue }
+    if ($existingNums -contains $p.ver) { Write-Host "$($p.ver): already on Modrinth - skip" -ForegroundColor Yellow; continue }
 
     $boundary = "----BiliFixBoundary$([Guid]::NewGuid().ToString('N'))"
     $versionObj = [PSCustomObject]@{

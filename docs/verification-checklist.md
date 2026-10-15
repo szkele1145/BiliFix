@@ -1,6 +1,6 @@
 # 游戏内验证清单（用户醒来后按此执行）
 
-> BiliFix v1.4.3 已部署在 `D:\PCL2\.minecraft\versions\航空学这一块\mods\`，
+> BiliFix v1.4.4 已部署在 `D:\PCL2\.minecraft\versions\航空学这一块\mods\`，
 > 启动游戏即可开始验证。
 > 
 > **前置链路**：哔哩哔哩WaterMedia兼容模组（bilibili_media，Modrinth: bilibilimedia）
@@ -12,7 +12,7 @@
 2. 打开日志（PCL 的日志页或 `logs/latest.log`），确认以下三行存在：
 
    ```
-   [BiliFix] v1.3.2 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+   [BiliFix] v1.4.4 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
    [BiliFix] ==== BiliFix 环境诊断 ====
    [BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
    ```

@@ -51,6 +51,9 @@ if ($manualPending) {
 
 if (-not $pending) { Write-Host 'Nothing pending - Modrinth is up to date with build\.' -ForegroundColor Green; return }
 
+$vers = ($pending | ForEach-Object { $_.ver }) -join ', '
+Write-Host "Discovered pending versions: $vers" -ForegroundColor Cyan
+
 foreach ($p in $pending) {
     $jarName = "BiliFix-$($p.ver)-mc1.21.1-neoforge.jar"
     $jarPath = Join-Path $root "build\$jarName"
@@ -95,10 +98,16 @@ foreach ($p in $pending) {
     $req.UserAgent = 'BiliFix-pending'
     $req.ContentLength = $payload.Length
     $s = $req.GetRequestStream(); $s.Write($payload, 0, $payload.Length); $s.Close()
-    $resp = $req.GetResponse()
-    $sr = New-Object System.IO.StreamReader($resp.GetResponseStream())
-    $result = ($sr.ReadToEnd() | ConvertFrom-Json)
-    Write-Host "$($p.ver): uploaded, id=$($result.id)" -ForegroundColor Green
+    try {
+        $resp = $req.GetResponse()
+        $sr = New-Object System.IO.StreamReader($resp.GetResponseStream())
+        $result = ($sr.ReadToEnd() | ConvertFrom-Json)
+        Write-Host "$($p.ver): uploaded, id=$($result.id)" -ForegroundColor Green
+    } catch [System.Net.WebException] {
+        $esr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+        Write-Warning "$($p.ver): upload FAILED - $($esr.ReadToEnd())"
+        continue
+    }
 }
 
 # ---- verify ----

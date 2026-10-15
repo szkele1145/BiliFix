@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *       <b>干净退出时删除</b>。</li>
  *   <li>{@code bilifix-diagnostic.txt} —— 退出快照。hook 里写入本次运行状态
  *       （加固次数、策略、生命周期事件）。</li>
+ *   <li>{@code bilifix-crash.txt} —— 异常终止<b>结论</b>。只在发现上次残留 lock 时
+ *       写入，干净退出不覆盖，所以用户晚几天回来查看也还有线索。</li>
  * </ul>
  *
  * <p>两者组合出的判定：</p>
@@ -43,9 +45,17 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class CrashSentinel {
     /** 会话进行中标记的文件名（存在 = 上次没有干净退出） */
     public static final String SESSION_FILE = "bilifix-session.lock";
-
     /** 退出快照文件名 */
     public static final String DIAGNOSTIC_FILE = "bilifix-diagnostic.txt";
+    /**
+     * 崩溃结论文件名（只在发现上次异常终止时写入，干净退出<b>不覆盖</b>）。
+     *
+     * <p>为什么单独一个文件：用户的实际行为往往是"崩溃 → 重启 → 再做点别的 →
+     * 正常退出 → 这时才想起来看日志"。若把结论只塞进退出快照
+     * （{@link #DIAGNOSTIC_FILE}），本次正常退出会把唯一的结论覆盖掉，线索
+     * 就此永久丢失。单独落盘后，结论会一直保留到下一次异常终止为止。</p>
+     */
+    public static final String CRASH_FILE = "bilifix-crash.txt";
 
     /** Mixin 参数加固的应用次数 */
     private static final AtomicLong HARDEN_COUNT = new AtomicLong();
@@ -119,12 +129,14 @@ public final class CrashSentinel {
                 // 时间不可读不影响判定，只是少一条信息
             }
             record("unclean previous session detected (lock age " + ageSec + "s)");
-            return "上次游戏会话异常终止（未执行 JVM 退出流程）。\n"
+            String report = "上次游戏会话异常终止（未执行 JVM 退出流程）。\n"
                  + "session lock: " + session + " (存在 " + ageSec + " 秒)\n"
                  + "这种退出方式（无 Java 堆栈 / 退出码 -1）与原生层崩溃一致。\n"
                  + "若你刚播过 B 站视频，请把这份文件和 PCL 的错误报告一起反馈。\n"
                  + "排查建议：确认 bilifix.toml 的 vout = \"gl,any\"、hwDecoder = \"none\"，"
                  + "然后把 vout 改为 \"original\" 对比是否复现。\n";
+            writeCrashReport(gameDir, ageSec, report);
+            return report;
         } catch (Throwable ignored) {
             // 取证失败绝不影响游戏启动
             return null;
@@ -201,5 +213,30 @@ public final class CrashSentinel {
     /** 游戏目录（NeoForge 与 Forge 的 API 同名，仅包名不同） */
     private static Path gameDirectory() {
         return net.neoforged.fml.loading.FMLPaths.GAMEDIR.get();
+    }
+
+    /**
+     * 把"上次异常终止"的结论写入 {@link #CRASH_FILE}。
+     *
+     * <p>与退出快照的区别：这个文件只在判定到异常终止时写，正常退出不动它，
+     * 所以用户晚几天回来查看也仍能看到结论。失败不影响游戏。</p>
+     */
+    private static void writeCrashReport(Path gameDir, long ageSec, String report) {
+        if (gameDir == null) return;
+        try {
+            StringBuilder sb = new StringBuilder(report.length() + 256);
+            sb.append("== BiliFix 异常终止报告 ==\n");
+            sb.append("detected at: ").append(Instant.now()).append('\n');
+            sb.append("version: ").append(BiliFixMod.VERSION).append('\n');
+            sb.append("lock age: ").append(ageSec).append("s\n");
+            sb.append('\n').append(report);
+            sb.append("-- end --\n");
+            Files.write(gameDir.resolve(CRASH_FILE),
+                    sb.toString().getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE);
+        } catch (Throwable ignored) {
+            // 写不出报告不影响游戏，也不影响日志里的同一条结论
+        }
     }
 }

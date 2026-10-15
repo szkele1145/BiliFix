@@ -178,7 +178,22 @@ public class Regression {
         probed = false;
         check("会话: null 目录安全", detectUnclean(null) == null);
 
+        // (g) 崩溃结论独立落盘：本次正常退出不得覆盖它（否则用户晚看就丢线索）
+        probed = false;
+        Files.write(lock, List.of("pid=999"), StandardCharsets.UTF_8);
+        String crashReport = detectUnclean(game);
+        check("会话: 判定后写出崩溃结论", Files.exists(game.resolve(CRASH_FILE)));
+        check("会话: 结论文本含崩溃线索", crashReport != null && crashReport.contains("原生层崩溃"));
+        check("会话: 结论含版本号",
+                Files.readString(game.resolve(CRASH_FILE), StandardCharsets.UTF_8).contains("version:"));
+        // 模拟"崩溃后重启并正常玩一局再退出"：快照被覆盖，结论必须存活
+        Files.write(snap, List.of("exit at: now", "harden count: 0"), StandardCharsets.UTF_8);
+        Files.deleteIfExists(lock);
+        check("会话: 正常退出不覆盖崩溃结论",
+                Files.readString(game.resolve(CRASH_FILE), StandardCharsets.UTF_8).contains("异常终止"));
+
         Files.deleteIfExists(snap);
+        Files.deleteIfExists(game.resolve(CRASH_FILE));
         Files.deleteIfExists(game);
 
         System.out.println();
@@ -202,6 +217,7 @@ public class Regression {
     // ===== 与 CrashSentinel 相同的会话取证逻辑（v1.4.7） =====
     static final String SESSION_FILE = "bilifix-session.lock";
     static final String DIAGNOSTIC_FILE = "bilifix-diagnostic.txt";
+    static final String CRASH_FILE = "bilifix-crash.txt";
     static boolean probed = false;
 
     /** 与 CrashSentinel.detectUncleanShutdown 同构：残留 lock = 上次未走退出流程 */
@@ -217,12 +233,22 @@ public class Regression {
                 ageSec = Math.max(0, (System.currentTimeMillis()
                         - Files.getLastModifiedTime(session).toMillis()) / 1000L);
             } catch (Throwable ignored) { }
-            return "上次游戏会话异常终止（未执行 JVM 退出流程）。\n"
+            String report = "上次游戏会话异常终止（未执行 JVM 退出流程）。\n"
                  + "session lock: " + session + " (存在 " + ageSec + " 秒)\n"
                  + "这种退出方式（无 Java 堆栈 / 退出码 -1）与原生层崩溃一致。\n"
                  + "若你刚播过 B 站视频，请把这份文件和 PCL 的错误报告一起反馈。\n"
                  + "排查建议：确认 bilifix.toml 的 vout = \"gl,any\"、hwDecoder = \"none\"，"
                  + "然后把 vout 改为 \"original\" 对比是否复现。\n";
+            // 结论独立落盘：本次正常退出的快照不会覆盖它
+            Files.write(gameDir.resolve(CRASH_FILE),
+                    ("== BiliFix 异常终止报告 ==\n"
+                     + "detected at: now\n"
+                     + "version: 1.4.7\n"
+                     + "lock age: " + ageSec + "s\n\n"
+                     + report + "-- end --\n").getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE);
+            return report;
         } catch (Throwable ignored) {
             return null;
         }

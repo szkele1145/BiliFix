@@ -64,3 +64,8 @@ BiliFix 的修复机制（Mixin 注入 watermedia 自己的 JarTool 类）不依
 forge universal jar 内）——若要支持 1.16.5 需从 universal jar 提取或用完整 forge dev 环境验证；
 1.19.2/1.20.1/1.21.5 依官方 Forge 惯例预计同型（javafml 机制在这几个版本间无大改），
 待逐版字节码确认后再扩发布面。
+## Mixin 目标的版本稳定性确认（2026-10-15 早）
+
+watermedia 2.1.37 是**单一通用 jar**（同一文件覆盖 1.16.5–1.21.5 × fabric/forge/neoforge，
+实测含 `org.watermedia.core.tools.JarTool`）——BiliFix 的 Mixin 目标类在全区间稳定存在。
+多版本扩展的唯一变量是**加载器引导层（FML）差异**，即已查证的三个机制点 + 各版本 FML 字节码。

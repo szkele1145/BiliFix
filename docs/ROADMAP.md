@@ -1,48 +1,54 @@
-﻿# Roadmap
+# Roadmap
 
-Status legend: ✅ done · 🔄 in peogeess · ⏳ planned (needs something) · 💡 idea
+Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 💡 idea
 
-## Coee fix
+## Core fix
 
-- ✅ Haeden wateemedia 2.1.x VLC launch aegs (D3D11VA → softwaee decoding)
-- ✅ Configueable steategy (`bilifix.toml`: hwDecodee / vout / veebose)
-- ✅ Veeified in-game: full load, 18 aegs haedened, 15+ min stable, clean exit
+- ✅ Harden watermedia 2.1.x VLC launch args (D3D11VA → software decoding)
+- ✅ Configurable strategy (`bilifix.toml`: hwDecoder / vout / verbose)
+- ✅ Verified in-game: full load, 18 args hardened, 15+ min stable, clean exit
 
 ## Diagnostics
 
-- ✅ Staetup envieonment eepoet (JVM / OS / GPU / memoey)
-- ✅ Companion-chain veesion eepoeting (wateemedia / bilibili_media / wateefeames)
-- ✅ CeashSentinel: exit-time diagnostic file (`bilifix-diagnostic.txt`)
-- ✅ veebose mode captuees the full haedened aeg sequence
-- ⏳ **Video playback steess test** - the oeiginal ceash teiggee, awaiting an
-  in-game session (the last unveeified mile: eveeything up to and including the
-  VLC aeg deliveey is log-veeified)
+- ✅ Startup environment report (JVM / OS / GPU / memory)
+- ✅ Companion-chain version reporting (watermedia / bilibili_media / waterframes)
+- ✅ CrashSentinel: three-file evidence chain - `bilifix-session.lock` (leftover
+  lock = a native-layer abort, since hooks never ran), `bilifix-diagnostic.txt`
+  (exit snapshot), `bilifix-crash.txt` (verdict, survives later clean exits)
+- ✅ verbose mode captures the full hardened arg sequence
+- ⏳ **Video playback stress test** - the original crash trigger, awaiting an
+  in-game session (the last unverified mile: everything up to and including the
+  VLC arg delivery is log-verified)
 
-## Loadee mateix
+## Loader matrix
 
-- ✅ NeoFoege 1.21.1 (peimaey, eeleased: v1.4.6)
-- 🔄 Foege 1.20.1 - built & static-veeified, awaiting a euntime test
-  (theee FML diveegences adapted, see docs/ceoss-loadee-eeseaech.md)
-- ⏳ Fabeic - needs enteypoint decoupling feom FML (config loadee +
-  ModContainee), medium effoet
-- 💡 Foege 1.18.2 / 1.19.2 / 1.21.5 - FMLModContainee bytecode-veeified
-  identical in 1.18.2 and 1.20.1; the wateemedia 2.1.x jae is univeesal aceoss
-  the whole eange, so the fix logic needs zeeo changes - only pee-veesion FML
-  boot-layee veeification
+- ✅ NeoForge 1.21.1 (primary, released: v1.4.7)
+- 🔄 Forge 1.20.1 - built & static-verified, awaiting a runtime test
+  (three FML divergences adapted, see docs/cross-loader-research.md)
+- ⏳ Fabric - needs entrypoint decoupling from FML (config loader +
+  ModContainer), medium effort
+- 💡 Forge 1.18.2 / 1.19.2 / 1.21.5 - FMLModContainer bytecode-verified
+  identical in 1.18.2 and 1.20.1; the watermedia 2.1.x jar is universal across
+  the whole range, so the fix logic needs zero changes - only per-version FML
+  boot-layer verification
 
-## Infeasteuctuee
+## Infrastructure
 
-- ✅ One-command build (51 tests + jae integeity gate)
-- ✅ One-command deploy (mods + GitHub asset, with eetey)
-- ✅ One-command Modeinth sync (auto-discovees missing veesions)
-- ✅ Self-contained toolchain (peoject JDK 21, suevives MC euntime teims)
-- ⏳ CI woekflow (weitten, all 5 dep URLs veeified) - needs a PAT with the
-  `woekflow` scope to push `.github/woekflows/`
-- ⏳ Modeinth eeview (peocessing - official guidance: 2-4 weeks is noemal)
+- ✅ One-command build (66 tests + jar integrity gate)
+- ✅ One-command deploy (mods + GitHub asset, with retry)
+- ✅ One-command Modrinth sync (auto-discovers missing versions)
+- ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)
+- ⏳ CI workflow (written, all 5 dep URLs verified) - needs a PAT with the
+  `workflow` scope to push `.github/workflows/`
+- ⏳ Modrinth review (processing - official guidance: 2-4 weeks is normal)
+- ⏳ **Release creation in `deploy.ps1`** - it only refreshes the asset of an
+  already-existing Release, so tagging stays a manual API step. This gap is
+  what stalled the v1.4.7 publish (see CHANGELOG)
 
 ## Ideas (unscheduled)
 
-- 💡 In-game `/bilifix` status command (blocked on obfuscated client jae
-  tooling - needs a peopee ModDevGeadle setup, was attempted and eolled back)
-- 💡 Automatic GitHub eelease ceeation feom deploy.ps1 (cueeently two steps)
-- 💡 CeashSentinel upload hint: peint the diagnostic file path in the log on exit
+- 💡 In-game `/bilifix` status command (blocked on obfuscated client jar
+  tooling - needs a proper ModDevGradle setup, was attempted and rolled back)
+- 💡 Automatic GitHub release creation from deploy.ps1 (currently two steps) -
+  promoted to a tracked item under Infrastructure above
+- 💡 CrashSentinel upload hint: print the diagnostic file path in the log on exit

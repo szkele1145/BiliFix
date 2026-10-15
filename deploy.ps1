@@ -1,4 +1,4 @@
-﻿# Deploy script (PowerShell, Windows)
+# Deploy script (PowerShell, Windows)
 # One command to sync the freshly built jar to: local mods folder + GitHub Release asset.
 # Eliminates channel drift. Tokens are read from ~\.dsh\gh.token (create it yourself;
 # NOT committed). Modrinth is handled separately by pending-modrinth.ps1.
@@ -77,6 +77,30 @@ if (Test-Path $ghTokenFile) {
         if ($rel) { break }
         Write-Host "  Release v$version not visible yet (attempt $attempt), waiting..." -ForegroundColor Yellow
         Start-Sleep -Seconds 5
+    }
+    if (-not $rel) {
+        # A tag/Release is NOT created by git push - it has to be made explicitly.
+        # Missing this step is what silently stalled the v1.4.7 publish, so create it here.
+        Write-Host "  no Release for v$version - creating tag + release..." -ForegroundColor Yellow
+        $notes = "BiliFix $version"
+        try {
+            $cl = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'), [System.Text.Encoding]::UTF8)
+            $esc = [regex]::Escape($version)
+            $m = [regex]::Match($cl, "(?s)## $esc[^\n]*\n(.*?)(?:\n## |\z)")
+            if ($m.Success -and $m.Groups[1].Value.Trim()) { $notes = $m.Groups[1].Value.Trim() }
+        } catch { Write-Host "  (changelog body unavailable, using a minimal body)" -ForegroundColor Yellow }
+        $payload = @{ tag_name = "v$version"; target_commitish = 'main'
+                      name = "BiliFix $version"; body = $notes
+                      draft = $false; prerelease = $false } | ConvertTo-Json -Depth 5
+        try {
+            $rel = Invoke-RestMethod -Method Post -Uri 'https://api.github.com/repos/szkele1145/BiliFix/releases' `
+                -Headers $h -Proxy $proxy -ContentType 'application/json; charset=utf-8' `
+                -Body ([System.Text.Encoding]::UTF8.GetBytes($payload))
+            Write-Host "  created Release v$version (id=$($rel.id))" -ForegroundColor Green
+        } catch {
+            Write-Warning "could not create Release v$version: $($_.Exception.Message)"
+            if ($_.ErrorDetails) { Write-Warning $_.ErrorDetails.Message }
+        }
     }
     if ($rel) {
         foreach ($a in $rel.assets) { Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/szkele1145/BiliFix/releases/assets/$($a.id)" -Headers $h -Proxy $proxy | Out-Null }

@@ -134,6 +134,12 @@ public class Regression {
         // 事件环（容量截断）
         check("Sentinel: ev2 独立于 ev1", !ev2.equals(ev1));
 
+        // ============ 12. modLine 版本可用性判定（v1.4.4） ============
+        check("modLine: 正常版本可用", verUsable("2.1.36"));
+        check("modLine: null 不可用", !verUsable(null));
+        check("modLine: 空 不可用", !verUsable(""));
+        check("modLine: ${version} 占位符不可用", !verUsable("${version}"));
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);
@@ -145,6 +151,11 @@ public class Regression {
                 + " (hw=none)";
         if (fullArgs != null) event += " | " + fullArgs;
         return event;
+    }
+
+    // ===== 与 modLine 相同的版本可用性判定 =====
+    static boolean verUsable(String ver) {
+        return ver != null && !ver.isBlank() && !ver.contains("${");
     }
 
     // ===== 与 JarToolMixin.bilifix$makeArgsSafe 完全一致的逻辑 =====

@@ -55,7 +55,12 @@ public final class BiliFixConfig {
                 BiliFixMod.LOGGER.info("[BiliFix] 已加载配置: {}", path);
             }
         } catch (Exception e) {
-            BiliFixMod.LOGGER.warn("[BiliFix] 配置加载失败，使用默认值（软解）: {}", e.toString());
+            // 显式重置为安全默认：日志说"使用默认值"就必须真的重置——
+            // 静态字段保留的是上次值（首次加载恰好等于默认，但未来 reload 时会残留用户旧值）
+            hwDecoder = "none";
+            vout = "gl,any";
+            verbose = false;
+            BiliFixMod.LOGGER.warn("[BiliFix] 配置加载失败，已重置为默认值（软解）: {}", e.toString());
         }
     }
 

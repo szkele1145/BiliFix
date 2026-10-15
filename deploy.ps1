@@ -1,10 +1,11 @@
 ﻿# Deploy script (PowerShell, Windows)
-# One command to sync the freshly built jar to: local mods folder, GitHub Release asset,
-# and (optionally) Modrinth. Eliminates manual drift between the three channels.
+# One command to sync the freshly built jar to: local mods folder + GitHub Release asset.
+# Eliminates channel drift. Tokens are read from ~\.dsh\gh.token (create it yourself;
+# NOT committed). Modrinth is handled separately by pending-modrinth.ps1.
 #
 # Usage:
 #   ./deploy.ps1                    # deploy to local mods + refresh GitHub asset
-#   ./deploy.ps1 -IncludeModrinth   # also replace the Modrinth version (deletes + re-uploads)
+#   ./deploy.ps1 -IncludeModrinth   # prints a pointer to pending-modrinth.ps1 (intentionally manual)
 #   ./deploy.ps1 -DryRun            # show what would happen, change nothing
 
 param(

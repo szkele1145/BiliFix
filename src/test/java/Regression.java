@@ -1,6 +1,7 @@
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.jar.*;
 
 /** BiliFix v1.1.0 回归测试：配置解析 + 参数替换（与 JarToolMixin/BiliFixConfig 相同逻辑） */
 public class Regression {
@@ -43,7 +44,7 @@ public class Regression {
             "--avcodec-hw", "d3d11va,dxva2,any",
             "--no-metadata-network-access", "--no-file-logging", "--http-reconnect"
         };
-        List<String> r1 = fixArgs(original, "none", "gl,any");
+        List<String> r1 = fixArgs("videolan/arguments", original, "none", "gl,any");
         check("替换: --avcodec-hw none 相邻", idx(r1,"--avcodec-hw") >= 0 && "none".equals(r1.get(idx(r1,"--avcodec-hw")+1)));
         check("替换: --vout gl,any 相邻", idx(r1,"--vout") >= 0 && "gl,any".equals(r1.get(idx(r1,"--vout")+1)));
         check("替换: 无 d3d11va 残留", !r1.toString().contains("d3d11va"));
@@ -54,37 +55,37 @@ public class Regression {
 
         // ============ 4. 参数替换（"--key=value" 等号形式） ============
         String[] eqForm = {"--no-quiet", "--avcodec-hw=d3d11va,dxva2,any", "--vout=direct3d11,glwin32,gl,any", "--http-reconnect"};
-        List<String> r2 = fixArgs(eqForm, "none", "gl,any");
+        List<String> r2 = fixArgs("videolan/arguments", eqForm, "none", "gl,any");
         check("等号: --avcodec-hw=none", r2.contains("--avcodec-hw=none"));
         check("等号: --vout=gl,any", r2.contains("--vout=gl,any"));
         check("等号: 其他保留", r2.contains("--no-quiet") && r2.contains("--http-reconnect"));
 
         // ============ 5. vout=original 不替换 vout ============
-        List<String> r3 = fixArgs(original, "none", null);
+        List<String> r3 = fixArgs("videolan/arguments", original, "none", null);
         check("original: vout 保留原值", r3.contains("direct3d11,glwin32,gl,any"));
         check("original: hw 仍然替换", idx(r3,"--avcodec-hw") >= 0 && "none".equals(r3.get(idx(r3,"--avcodec-hw")+1)));
 
         // ============ 6. 混合形式与边界 ============
         String[] mixed = {"--avcodec-hw", "d3d11va", "--vout=direct3d11"};
-        List<String> r4 = fixArgs(mixed, "dxva2", "gl,any");
+        List<String> r4 = fixArgs("videolan/arguments", mixed, "dxva2", "gl,any");
         check("混合: 空格形式 hw", r4.contains("--avcodec-hw") && r4.get(r4.indexOf("--avcodec-hw")+1).equals("dxva2"));
         check("混合: 等号形式 vout", r4.contains("--vout=gl,any"));
 
         // ============ 7. v1.1.1 防御：参数表缺失时主动补加 ============
         String[] noHw = {"--no-quiet", "--http-reconnect"};
-        List<String> r5 = fixArgs(noHw, "none", "gl,any");
+        List<String> r5 = fixArgs("videolan/arguments", noHw, "none", "gl,any");
         check("防御: 补加 --avcodec-hw none", idx(r5,"--avcodec-hw") >= 0 && "none".equals(r5.get(idx(r5,"--avcodec-hw")+1)));
         check("防御: 补加 --vout gl,any", idx(r5,"--vout") >= 0 && "gl,any".equals(r5.get(idx(r5,"--vout")+1)));
         check("防御: 原参数保留", r5.contains("--no-quiet") && r5.contains("--http-reconnect"));
 
         // vout=original 且参数表无 vout 时不补加
-        List<String> r6 = fixArgs(noHw, "none", null);
+        List<String> r6 = fixArgs("videolan/arguments", noHw, "none", null);
         check("防御: vout=original 时不补加 vout", !r6.contains("--vout"));
         check("防御: hw 仍然补加", idx(r6,"--avcodec-hw") >= 0 && "none".equals(r6.get(idx(r6,"--avcodec-hw")+1)));
 
         // ============ 8. 短选项值边界（isValue 含 - 排除） ============
         String[] shortOpt = {"--avcodec-hw", "-something"};
-        List<String> r7 = fixArgs(shortOpt, "none", null);
+        List<String> r7 = fixArgs("videolan/arguments", shortOpt, "none", null);
         check("边界: 以-开头不算值", r7.contains("-something")); // -something 被当作下一个参数保留
 
         // ============ 9. 配置值解析边界（v1.2.1 stripValue） ============
@@ -94,6 +95,64 @@ public class Regression {
         check("配置: 裸值无注释", "false".equals(stripValue("false")));
         check("配置: 未闭合引号", "abc".equals(stripValue("\"abc")));
         check("配置: 空值", "".equals(stripValue("")));
+
+        // ============ 9.5. mixin 资源守卫与边界（与 JarToolMixin 行为同步） ============
+        String[] plain = {"--no-quiet", "--http-reconnect"};
+        List<String> g1 = fixArgs("other.json", plain, "none", "gl,any");
+        check("资源守卫: 非 videolan 资源原样返回", g1.equals(Arrays.asList(plain)));
+        List<String> g2 = fixArgs("videolan/arguments", new String[0], "none", "gl,any");
+        check("资源守卫: 空参数表原样返回", g2.isEmpty());
+        List<String> g3 = fixArgs("videolan/arguments", null, "none", "gl,any");
+        check("资源守卫: null 参数表返回空列表", g3.isEmpty());
+        List<String> g4 = fixArgs("videolan/arguments", new String[]{"--avcodec-hw"}, "none", null);
+        check("边界: --avcodec-hw 结尾缺值时补加 hw 值",
+                g4.equals(Arrays.asList("--avcodec-hw", "none")));
+        List<String> g5 = fixArgs("videolan/arguments", new String[]{"--vout"}, "none", null);
+        check("边界: 裸 --vout 原样保留（vout=null），末尾补加 --avcodec-hw",
+                g5.equals(Arrays.asList("--vout", "--avcodec-hw", "none")));
+        List<String> g6 = fixArgs("videolan/arguments", new String[]{"--vout=original"}, "none", null);
+        check("边界: --vout=original 原样保留（vout=null），末尾补加 --avcodec-hw",
+                g6.equals(Arrays.asList("--vout=original", "--avcodec-hw", "none")));
+
+        // ============ 9.6. jar 包结构：必须包含类、mixin 清单、mods.toml、logo ============
+        Path neoJar = Paths.get("build", "BiliFix-1.4.7-mc1.21.1-neoforge.jar");
+        if (Files.exists(neoJar)) {
+            try (JarFile jf = new JarFile(neoJar.toFile())) {
+                check("jar: 含 bilifix/BiliFixMod.class",
+                        jf.getJarEntry("dev/polaris_fix/bilifix/BiliFixMod.class") != null);
+                check("jar: 含 bilifix/CrashSentinel.class",
+                        jf.getJarEntry("dev/polaris_fix/bilifix/CrashSentinel.class") != null);
+                check("jar: 含 bilifix/mixin/JarToolMixin.class",
+                        jf.getJarEntry("dev/polaris_fix/bilifix/mixin/JarToolMixin.class") != null);
+                check("jar: 含 bilifix.mixins.json", jf.getJarEntry("bilifix.mixins.json") != null);
+                check("jar: 含 bilifix_logo.png", jf.getJarEntry("bilifix_logo.png") != null);
+                check("jar: 含 neoforge.mods.toml", jf.getJarEntry("META-INF/neoforge.mods.toml") != null);
+            }
+        } else {
+            System.out.println("  [SKIP] jar: build 产物缺失，跳过 jar 结构检查");
+        }
+
+        // ============ 9.7. mods.toml 结构：modId、version、[[mixins]] 三要素 ============
+        Path neoToml = Paths.get("src", "main", "resources", "META-INF", "neoforge.mods.toml");
+        Path mixinsJson = Paths.get("src", "main", "resources", "bilifix.mixins.json");
+        if (Files.exists(neoToml)) {
+            String toml = Files.readString(neoToml, StandardCharsets.UTF_8);
+            check("mods.toml: modId = \"bilifix\"", toml.contains("modId = \"bilifix\""));
+            check("mods.toml: version = \"1.4.7\"", toml.contains("version = \"1.4.7\""));
+            check("mods.toml: 依赖 neoforge", toml.contains("modId = \"neoforge\""));
+            check("mods.toml: [[mixins]] 存在", toml.contains("[[mixins]]"));
+        } else {
+            System.out.println("  [SKIP] mods.toml: 源文件缺失，跳过结构检查");
+        }
+        if (Files.exists(mixinsJson)) {
+            String mixins = Files.readString(mixinsJson, StandardCharsets.UTF_8);
+            check("mixins.json: 类 JarToolMixin", mixins.contains("JarToolMixin"));
+            check("mixins.json: required=false", mixins.contains("\"required\": false"));
+            check("mixins.json: injectors.defaultRequire=0",
+                    mixins.contains("\"defaultRequire\": 0"));
+        } else {
+            System.out.println("  [SKIP] bilifix.mixins.json: 源文件缺失，跳过结构检查");
+        }
 
         // ============ 10. 端到端：写默认文件→重读→改值→再读 ============
         Path cfgDir = Files.createTempDirectory("bilifix-e2e");
@@ -255,7 +314,15 @@ public class Regression {
     }
 
     // ===== 与 JarToolMixin.bilifix$makeArgsSafe 完全一致的逻辑 =====
-    static List<String> fixArgs(String[] original, String hw, String vout) {
+    static List<String> fixArgs(String resource, String[] original, String hw, String vout) {
+        // 资源守卫：非 videolan/arguments 资源不触碰（同 @Pseudo mixin 的 resource 检查）
+        if (resource == null || !resource.contains("videolan/arguments")) {
+            return original == null ? List.of() : new ArrayList<>(Arrays.asList(original));
+        }
+        // 空参数表：不修改、不追加
+        if (original == null || original.length == 0) {
+            return original == null ? List.of() : new ArrayList<>(Arrays.asList(original));
+        }
         List<String> fixed = new ArrayList<>(original.length + 4);
         boolean sawHw = false, sawVout = false;
         for (int i = 0; i < original.length; i++) {

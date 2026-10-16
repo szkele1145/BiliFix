@@ -41,9 +41,10 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 - ⏳ CI workflow (written, all 5 dep URLs verified) - needs a PAT with the
   `workflow` scope to push `.github/workflows/`
 - ⏳ Modrinth review (processing - official guidance: 2-4 weeks is normal)
-- ⏳ **Release creation in `deploy.ps1`** - it only refreshes the asset of an
-  already-existing Release, so tagging stays a manual API step. This gap is
-  what stalled the v1.4.7 publish (see CHANGELOG)
+- ✅ **Release creation in `deploy.ps1`** - now auto-creates the tag + Release
+  from CHANGELOG when `v<version>` is missing, then refreshes/upload the jar
+  asset. Verified end-to-end on 2026-10-16: asset URL
+  https://github.com/szkele1145/BiliFix/releases/download/v1.4.7/BiliFix-1.4.7-mc1.21.1-neoforge.jar
 
 ## Ideas (unscheduled)
 

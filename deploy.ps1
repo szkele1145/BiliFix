@@ -1,4 +1,4 @@
-# Deploy script (PowerShell, Windows)
+﻿# Deploy script (PowerShell, Windows)
 # One command to sync the freshly built jar to: local mods folder + GitHub Release asset.
 # Eliminates channel drift. Tokens are read from ~\.dsh\gh.token (create it yourself;
 # NOT committed). Modrinth is handled separately by pending-modrinth.ps1.
@@ -98,7 +98,7 @@ if (Test-Path $ghTokenFile) {
                 -Body ([System.Text.Encoding]::UTF8.GetBytes($payload))
             Write-Host "  created Release v$version (id=$($rel.id))" -ForegroundColor Green
         } catch {
-            Write-Warning "could not create Release v$version: $($_.Exception.Message)"
+            Write-Warning "could not create Release v${version}: $($_.Exception.Message)"
             if ($_.ErrorDetails) { Write-Warning $_.ErrorDetails.Message }
         }
     }

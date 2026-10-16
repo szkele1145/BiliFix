@@ -1,6 +1,7 @@
-﻿# Pending Modrinth uploads: v1.4.2 + v1.4.3 (blocked on an expired token).
-# Run this ONCE after placing a fresh Modrinth PAT (with Create/Edit Version scopes)
-# into ~\.dsh\mr.token - it uploads both pending versions and verifies.
+# Modrinth upload sync: auto-discovers every BiliFix-*-mc1.21.1-neoforge.jar in
+# build\ that is not yet on Modrinth and uploads it, using the GitHub Release body
+# as the changelog. Reads a Modrinth PAT (Create + Edit Version scopes) from
+# ~\.dsh\mr.token - it is never committed.
 #
 # Usage: ./pending-modrinth.ps1
 
@@ -74,7 +75,9 @@ foreach ($p in $pending) {
         loaders = @('neoforge')
         featured = $p.featured
         dependencies = @(
-            [PSCustomObject]@{ project_id = 'vqvS4GPe'; dependency_type = 'optional' },
+            # BiliBiliMedia is genuinely required (the fix only matters alongside it);
+            # WATERMEDIA stays optional. Keep this in sync with the Modrinth project page.
+            [PSCustomObject]@{ project_id = 'vqvS4GPe'; dependency_type = 'required' },
             [PSCustomObject]@{ project_id = 'G922NeHS'; dependency_type = 'optional' }
         )
     }

@@ -103,8 +103,12 @@ After launching, the log should contain:
 
 ```
 [BiliFix] v1.4.7 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
-[BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 16 项 → 新 16 项)
+[BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
 ```
+
+> The argument counts in parentheses come from watermedia and vary by its version
+> (18 with 2.1.36). What matters is that both hardening entries were replaced and
+> the total count is unchanged — no argument was dropped.
 
 Then play the video that previously crashed the game — it should no longer exit.
 
@@ -117,7 +121,7 @@ Then play the video that previously crashed the game — it should no longer exi
 ## Building From Source
 
 ```powershell
-./build.ps1   # compile + run 66 regression tests + package
+./build.ps1   # compile + run 85 regression tests + package
 ```
 
 The script auto-detects the JDK 21 (Minecraft runtime works) and the game

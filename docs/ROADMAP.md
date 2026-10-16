@@ -6,7 +6,9 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 
 - ✅ Harden watermedia 2.1.x VLC launch args (D3D11VA → software decoding)
 - ✅ Configurable strategy (`bilifix.toml`: hwDecoder / vout / verbose)
-- ✅ Verified in-game: full load, 18 args hardened, 15+ min stable, clean exit
+- ✅ Verified in-game: full load, 18 args hardened, clean exit
+  (evidence from **v1.3.2** — 14 min — and **v1.4.4** — 51 min, both clean;
+  **v1.4.7 has never been launched**, so its new forensic path is unverified)
 
 ## Diagnostics
 
@@ -16,9 +18,14 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   lock = a native-layer abort, since hooks never ran), `bilifix-diagnostic.txt`
   (exit snapshot), `bilifix-crash.txt` (verdict, survives later clean exits)
 - ✅ verbose mode captures the full hardened arg sequence
+- ⏳ **v1.4.7 runtime verification** - the jar was deployed 2026-10-16 07:30 but
+  has never been launched; the forensic additions (`bilifix-session.lock`,
+  `bilifix-crash.txt`, the `media touched` field) are an untested code path
 - ⏳ **Video playback stress test** - the original crash trigger, awaiting an
   in-game session (the last unverified mile: everything up to and including the
-  VLC arg delivery is log-verified)
+  VLC arg delivery is log-verified, but no session has ever been shown to
+  actually play media — v1.4.4's 51-minute session predates the `media touched`
+  field and cannot prove playback)
 
 ## Loader matrix
 
@@ -34,7 +41,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 
 ## Infrastructure
 
-- ✅ One-command build (66 tests + jar integrity gate)
+- ✅ One-command build (85 tests + jar integrity gate)
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)
@@ -50,6 +57,4 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 
 - 💡 In-game `/bilifix` status command (blocked on obfuscated client jar
   tooling - needs a proper ModDevGradle setup, was attempted and rolled back)
-- 💡 Automatic GitHub release creation from deploy.ps1 (currently two steps) -
-  promoted to a tracked item under Infrastructure above
 - 💡 CrashSentinel upload hint: print the diagnostic file path in the log on exit

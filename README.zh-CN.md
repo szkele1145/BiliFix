@@ -100,8 +100,11 @@ verbose = false
 [BiliFix] v1.4.7 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] ==== BiliFix 环境诊断 ====
 [BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
-[BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 16 项 → 新 16 项)
+[BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
 ```
+
+> 括号里的参数数量由 watermedia 决定，会随其版本变化（2.1.36 实测为 18 项）；
+> 关键是两个加固项已替换、且总项数不变（没有丢参数）。
 
 然后播放之前必崩的视频，游戏不再退出。
 
@@ -110,7 +113,7 @@ verbose = false
 ## 从源码构建
 
 ```powershell
-./build.ps1   # 编译 + 66 项回归测试 + 打包
+./build.ps1   # 编译 + 85 项回归测试 + 打包
 ```
 
 脚本自动探测 JDK 21（Minecraft 运行时即可）与游戏库目录。可用环境变量覆盖：BILIFIX_JAVAC、BILIFIX_LIBS，或参数 -WatermediaJar。

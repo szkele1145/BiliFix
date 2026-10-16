@@ -47,9 +47,17 @@ if ($DryRun) {
 
 Write-Host "pushing $branch ($local)..." -ForegroundColor Cyan
 # Empty credential.helper disables the manager; the extraheader carries the token.
+# NOTE: git writes progress ("To https://...", "   4bf9c18..b273823  main -> main")
+# to stderr. With $ErrorActionPreference='Stop' PowerShell turns each of those
+# lines into a terminating NativeCommandError, so the push would report exit 1
+# even when it fully succeeded. Relax the preference around the call and judge
+# success by $LASTEXITCODE alone.
+$ErrorActionPreference = 'Continue'
 git -c credential.helper= -c "http.https://github.com/.extraheader=Authorization: Basic $basic" push origin $branch 2>&1 |
     ForEach-Object { Write-Host "  $_" }
-if ($LASTEXITCODE -ne 0) { Write-Error "push failed (exit $LASTEXITCODE)"; exit $LASTEXITCODE }
+$pushExit = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($pushExit -ne 0) { Write-Error "push failed (exit $pushExit)"; exit $pushExit }
 
 $remote = (git ls-remote origin "refs/heads/$branch" 2>$null | ForEach-Object { $_.Split()[0] })
 if ($remote -and $remote.StartsWith($local)) {

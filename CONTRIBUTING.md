@@ -13,7 +13,7 @@ failures degrade silently (warnings at most), never escalate to load errors.
 ```powershell
 git clone https://github.com/szkele1145/BiliFix
 cd BiliFix
-./build.ps1        # compile + 85 regression tests + jar integrity check
+./build.ps1        # compile + 89 regression tests + jar integrity check
 ```
 
 Requirements: any JDK 21 (the build auto-detects `.tools\jdk21`, the MC runtime, or PATH).
@@ -22,17 +22,21 @@ Requirements: any JDK 21 (the build auto-detects `.tools\jdk21`, the MC runtime,
 
 ```
 src/main/java/dev/polaris_fix/bilifix/
-  BiliFixMod.java            # @Mod entry
+  BiliFixMod.java            # @Mod entry + loader-agnostic core init(Path, Path)
+  FmlBridge.java             # reflection bridge to FML (never throws; null = fallback)
   CrashSentinel.java         # shutdown-hook diagnostic guardian
   EnvironmentDiagnostics.java# startup environment report
   config/BiliFixConfig.java  # bilifix.toml loader (zero-dependency TOML subset)
   mixin/JarToolMixin.java   # THE fix: hardens watermedia's VLC launch args
+src/fabric/                 # Fabric-only sources (never seen by Forge/NeoForge builds)
 src/main/resources/
   META-INF/neoforge.mods.toml  # FML metadata (also copied to mods.toml)
-  bilifix.mixins.json          # mixin config (@Pseudo, defaultRequire=0)
-src/test/java/Regression.java # 85 assertions, mirrors production logic 1:1
-build.ps1          # build + test + package + integrity gate
-build-forge.ps1    # Forge 1.20.1 variant (same sources, see docs/cross-loader-research.md)
+  bilifix.mixins.json          # mixin config (@Pseudo, defaultRequire=0; stays JAVA_21,
+                               #   1.20.1 variants rewrite to JAVA_17 at packaging)
+src/test/java/Regression.java # 89 assertions, mirrors production logic 1:1
+build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
+build-forge.ps1    # Forge 1.20.1 variant (see docs/cross-loader-research.md)
+build-fabric.ps1   # Fabric 1.20.1 variant (staging strip + entrypoint)
 deploy.ps1         # local mods + GitHub asset sync
 pending-modrinth.ps1  # auto-discovers and uploads versions missing from Modrinth
 ```

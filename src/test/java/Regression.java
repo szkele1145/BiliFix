@@ -161,6 +161,44 @@ public class Regression {
             System.out.println("  [SKIP] jar: build 产物缺失，跳过 jar 结构检查");
         }
 
+        // ============ 9.6b. 1.20.1 变体 jar 守卫（v1.4.8）：结构 + JAVA_17 改写无残留 ============
+        // 依据（MixinProbe 实证）：1.20.1 的运行时 mixin（mixin-0.8.5 / sponge-mixin）的
+        // CompatibilityLevel 枚举只有 JAVA_16/17/18，in-jar 残留 JAVA_21 会在 mixin
+        // 引导期抛 IllegalArgumentException 直接炸加载。若构建脚本的暂存改写被
+        // git checkout 等操作静默丢失，这里必须 FAIL 而不是 SKIP。
+        for (String[] variant : new String[][]{
+                {"-mc1.20.1-forge.jar",  "MANIFEST MixinConfigs"},
+                {"-mc1.20.1-fabric.jar", "fabric.mod.json entrypoint"}}) {
+            Path vjar = pickJar("BiliFix-", variant[0]);
+            if (vjar == null) { System.out.println("  [SKIP] jar: " + variant[0] + " 未构建，跳过"); continue; }
+            try (JarFile jf = new JarFile(vjar.toFile())) {
+                String nm = vjar.getFileName().toString();
+                check("jar: " + nm + " 含 JarToolMixin.class",
+                        jf.getJarEntry("dev/polaris_fix/bilifix/mixin/JarToolMixin.class") != null);
+                check("jar: " + nm + " 含 bilifix.mixins.json",
+                        jf.getJarEntry("bilifix.mixins.json") != null);
+                // in-jar mixins.json 必须是 JAVA_17 且无 JAVA_21 残留（防暂存改写回归）
+                var me = jf.getJarEntry("bilifix.mixins.json");
+                String mtxt = new String(jf.getInputStream(me).readAllBytes(), StandardCharsets.UTF_8);
+                check("jar: " + nm + " mixins.json JAVA_17 改写生效",
+                        mtxt.contains("\"JAVA_17\"") && !mtxt.contains("JAVA_21"));
+                if ("-mc1.20.1-fabric.jar".equals(variant[0])) {
+                    check("jar: " + nm + " 含 fabric.mod.json 且 entrypoint 声明正确",
+                            jf.getJarEntry("fabric.mod.json") != null);
+                    var fe = jf.getJarEntry("fabric.mod.json");
+                    String ftxt = new String(jf.getInputStream(fe).readAllBytes(), StandardCharsets.UTF_8);
+                    check("jar: " + nm + " entrypoint = BiliFixFabric",
+                            ftxt.contains("dev.polaris_fix.bilifix.fabric.BiliFixFabric"));
+                    check("jar: " + nm + " 含 BiliFixFabric.class（entrypoint 可加载）",
+                            jf.getJarEntry("dev/polaris_fix/bilifix/fabric/BiliFixFabric.class") != null);
+                } else {
+                    var mf = jf.getManifest();
+                    check("jar: " + nm + " MANIFEST 含 MixinConfigs",
+                            mf != null && mf.getMainAttributes().getValue("MixinConfigs") != null);
+                }
+            }
+        }
+
         // ============ 9.7. mods.toml 结构：modId、version、[[mixins]] 三要素 ============
         Path neoToml = Paths.get("src", "main", "resources", "META-INF", "neoforge.mods.toml");
         Path mixinsJson = Paths.get("src", "main", "resources", "bilifix.mixins.json");

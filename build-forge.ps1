@@ -1,4 +1,4 @@
-﻿# Forge 1.20.1 variant builder.
+# Forge 1.20.1 variant builder.
 # Produces BiliFix-<version>-mc1.20.1-forge.jar from the SAME sources with 3 import
 # substitutions (net.neoforged.* -> net.minecraftforge.*) + Forge-flavored mods.toml.
 # Layout: src/main/java is shared; this script stages patched copies into build/forge.
@@ -11,12 +11,21 @@ $OutDir = Join-Path $root 'build\forge'
 $javac = $env:BILIFIX_JAVAC
 if (-not $javac) { $t = Get-Command javac -ErrorAction SilentlyContinue; if ($t) { $javac = $t.Source } }
 if (-not $javac) {
-    # MC runtime is a trimmed JRE (no javac) - probe local JDKs instead
-    foreach ($probe in @("$env:USERPROFILE\.jdks\ms-17.0.19\bin\javac.exe", 'C:\jdk17\bin\javac.exe')) {
-        if (Test-Path $probe) { $javac = $probe; break }
+    # MC runtime is a trimmed JRE (no javac) - probe local JDKs instead.
+    # NOTE: --release 17 works on any JDK >= 17, so a 21 JDK is fine here too
+    # (v1.4.8: .jdks/ is no longer guaranteed to exist; probe every known location).
+    foreach ($probe in @(
+        "$env:BILIFIX_JAVAC",
+        "$root\.tools\jdk21\bin\javac.exe",
+        "$env:USERPROFILE\.jdks\ms-17.0.19\bin\javac.exe",
+        'C:\jdk17\bin\javac.exe',
+        'C:\jdk21\bin\javac.exe',
+        "$env:APPDATA\.minecraft\runtime\java-runtime-delta\bin\javac.exe"
+    )) {
+        if ($probe -and (Test-Path $probe)) { $javac = $probe; break }
     }
 }
-if (-not $javac) { throw 'no JDK found: set BILIFIX_JAVAC or install one (.jdks/ms-17.0.19 expected for --release 17)' }
+if (-not $javac) { throw 'no JDK found: set BILIFIX_JAVAC or install one (--release 17 needs JDK >= 17)' }
 $jar = $javac -replace 'javac\.exe$', 'jar.exe'
 
 # Forge 1.20.1 deps (downloaded on demand into build\forge\libs)
@@ -93,7 +102,21 @@ $stage = "$OutDir\jar"
 Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path "$stage\META-INF" | Out-Null
 Copy-Item "$OutDir\classes\dev" "$stage\dev" -Recurse -Force
-Copy-Item (Join-Path $root 'src\main\resources\bilifix.mixins.json') "$stage\" -Force
+# ---- mixins.json: JAVA_21 -> JAVA_17 (v1.4.8) ----
+# PROVEN against the real mixin-0.8.5.jar (MixinProbe): its CompatibilityLevel enum
+# has ONLY JAVA_16/JAVA_17/JAVA_18, so "JAVA_21" throws
+#   IllegalArgumentException: No enum constant ...CompatibilityLevel.JAVA_21
+# at mixin bootstrap. The shared resource keeps JAVA_21 for the NeoForge 1.21.1 main
+# line, so the 1.20.1 variants must downgrade it at staging time.
+$mixinsSrc = Join-Path $root 'src\main\resources\bilifix.mixins.json'
+$mixinsTxt = [System.IO.File]::ReadAllText($mixinsSrc, [System.Text.Encoding]::UTF8)
+if ($mixinsTxt -notmatch '"compatibilityLevel"\s*:\s*"JAVA_21"') {
+    Write-Warning 'bilifix.mixins.json: no "compatibilityLevel": "JAVA_21" found - source may have changed'
+}
+$mixinsTxt = $mixinsTxt -replace '"compatibilityLevel"\s*:\s*"JAVA_21"', '"compatibilityLevel": "JAVA_17"'
+if ($mixinsTxt -match 'JAVA_21') { throw 'mixins.json still contains JAVA_21 after downgrade' }
+[System.IO.File]::WriteAllText("$stage\bilifix.mixins.json", $mixinsTxt, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host 'mixins.json staged with compatibilityLevel=JAVA_17' -ForegroundColor Green
 Copy-Item (Join-Path $root 'src\main\resources\bilifix_logo.png') "$stage\" -Force
 [System.IO.File]::WriteAllText("$stage\META-INF\mods.toml", $toml, (New-Object System.Text.UTF8Encoding($false)))
 @"

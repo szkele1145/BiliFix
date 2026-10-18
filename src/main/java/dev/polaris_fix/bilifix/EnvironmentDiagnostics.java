@@ -109,15 +109,14 @@ public final class EnvironmentDiagnostics {
 
     /**
      * 生成一行 mod 状态报告：通过 FML ModList 查 mod 的版本（运行时 API，统一来源）。
-     * FML 不可用时（极端早期）回退到 classpath 检测，只报存在性不报版本。
+     * FML 不可用时（Fabric / 极端早期）回退到 classpath 检测，只报存在性不报版本。
      * 版本值含 "${}" 未替换占位符（上游打包瑕疵）时视为无版本。
      */
     private static String modLine(String modId, String presentNote, String absentNote) {
         try {
-            var mi = net.neoforged.fml.ModList.get().getModFileById(modId);
-            if (mi != null) {
-                String ver = mi.versionString();
-                boolean usable = ver != null && !ver.isBlank() && !ver.contains("${");
+            String ver = FmlBridge.modVersion(modId);
+            if (ver != null) {
+                boolean usable = !ver.isBlank() && !ver.contains("${");
                 return "已安装 ✓" + (usable ? "（版本 " + ver + "）" : "") + "（" + presentNote + "）";
             }
         } catch (Throwable ignored) {

@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### 新增：Forge 1.20.1 变体（`BiliFix-<ver>-mc1.20.1-forge.jar`）
+- 适配 Forge 1.20.1 的三处 FML 分歧（详见 `docs/cross-loader-research.md`）：
+  - **mixin 兼容级**：实测（MixinProbe，针对真实 mixin-0.8.5.jar）其
+    `CompatibilityLevel` 枚举只有 `JAVA_16/JAVA_17/JAVA_18`——`"JAVA_21"` 会在
+    mixin 引导期抛 `IllegalArgumentException: No enum constant`。共享的
+    `bilifix.mixins.json` 为 NeoForge 1.21.1 主线保留 `JAVA_21`，Forge/Fabric
+    1.20.1 变体在打包时改写为 `JAVA_17`（构建脚本内含"改写后不得残留 JAVA_21"
+    的硬断言，防止回归）
+  - **包名**：`net.neoforged.fml → net.minecraftforge.fml` 暂存改写；`FmlBridge`
+    的候选包名刻意拆字符串拼接，即使被全文替换也只是冗余候选
+  - **入口**：Forge 侧 `@Mod` 构造器改为无参 + 反射 `FMLPaths`（`ModContainer`
+    构造器形状差异），MANIFEST 增加 `MixinConfigs: bilifix.mixins.json`
+- 构建脚本加固：javac 探测链覆盖 `BILIFIX_JAVAC` → 项目内 `.tools\jdk21` →
+  系统路径（环境漂移后不再 BadExpression 崩溃，缺 JDK 时给出可操作报错）
+
+### 新增：Fabric 1.20.1 变体（`BiliFix-<ver>-mc1.20.1-fabric.jar`）
+- 入口解耦：loader 无关核心 `BiliFixMod.init(Path, Path)`（仅依赖 JDK +
+  slf4j）；Fabric 入口 `BiliFixFabric implements ModInitializer` 调用同一核心
+- `@Mod`/`ModContainer` 在 Fabric classpath 上不存在 → 打包时暂存源码剥离
+  注解与 import、构造器改无参；`src\fabric\*` 不会被 Forge/NeoForge 脚本看到，
+  反向污染不存在（三个 jar 已做字节码级交叉污染审计：Fabric jar 无任何
+  `net/neoforged`/`net/minecraftforge` 内部名引用，反之亦然）
+- `FmlBridge` 反射查 FML 不可用 → classpath 探测降级（运行时实证
+  FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
+
 ### 测试
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）

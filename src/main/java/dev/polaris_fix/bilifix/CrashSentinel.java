@@ -73,7 +73,26 @@ public final class CrashSentinel {
     /** 上次会话探测只做一次：重复构造时第二次会看到本次刚写的 lock，误报为崩溃 */
     private static volatile boolean probed = false;
 
+    /**
+     * 外部注入的游戏目录（Fabric 侧用）。为 null 时走 FMLPaths 兜底，
+     * 使同一份 CrashSentinel 在 NeoForge/Forge（FMLPaths 可用）与
+     * Fabric（FML 不可用，由 entrypoint 注入）上都能正确工作。
+     */
+    private static volatile Path injectedGameDir;
+
     private CrashSentinel() {}
+
+    /**
+     * 注入游戏目录（Fabric entrypoint 调用）。
+     *
+     * <p>为什么需要注入：Fabric 上没有 FML，{@code FMLPaths} 不可用。让 Fabric
+     * 侧把 {@code FabricLoader.getInstance().getGameDir()} 传进来，同一份
+     * CrashSentinel 就能在三种 loader 上共用，无需维护第二份实现。
+     * 本方法只依赖 JDK 的 {@link Path}，所以在纯 JVM 测试里也能调用。</p>
+     */
+    public static void setGameDir(Path gameDir) {
+        injectedGameDir = gameDir;
+    }
 
     /** 记录一次 Mixin 参数加固（fullArgs 非空时附带完整参数序列） */
     public static void recordHarden(int originalCount, int newCount, String fullArgs) {
@@ -210,9 +229,19 @@ public final class CrashSentinel {
         }
     }
 
-    /** 游戏目录（NeoForge 与 Forge 的 API 同名，仅包名不同） */
+    /**
+     * 解析游戏目录：优先用 {@link #setGameDir(Path)} 注入的值（Fabric 侧），
+     * 否则通过 {@link FmlBridge} 反射读取 FML 的 {@code FMLPaths.GAMEDIR}
+     * （NeoForge / Forge 的包名不同，反射可同时兼容，且 Fabric 编译期无需这些类）。
+     *
+     * <p>Fabric 运行时（无注入且无 FML）返回 null；所有调用方均已做 null 判定
+     * （{@code onShutdown} 的 delete 分支、{@code writeDiagnostic}、
+     * {@code writeCrashReport} 的 early-return），不会 NPE。</p>
+     */
     private static Path gameDirectory() {
-        return net.neoforged.fml.loading.FMLPaths.GAMEDIR.get();
+        Path injected = injectedGameDir;
+        if (injected != null) return injected;
+        return FmlBridge.fmlDir("GAMEDIR");
     }
 
     /**

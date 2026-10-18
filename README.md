@@ -78,16 +78,23 @@ The startup diagnostics also report the exact companion-chain versions
 
 ## Install
 
-1. Drop `BiliFix-x.x.x-mc1.21.1-neoforge.jar` into your `mods` folder
-2. Requires NeoForge 21.1 (MC 1.21.1); watermedia 2.1.x (optional dependency — BiliFix silently idles without it)
+1. Download the jar for your loader into your `mods` folder:
+
+   | Loader / game version | File |
+   |---|---|
+   | NeoForge 1.21.1 | `BiliFix-x.x.x-mc1.21.1-neoforge.jar` |
+   | Forge 1.20.1 | `BiliFix-x.x.x-mc1.20.1-forge.jar` |
+   | Fabric 1.20.1 | `BiliFix-x.x.x-mc1.20.1-fabric.jar` |
+
+2. Requires the matching loader from the table; watermedia 2.1.x (optional dependency — BiliFix silently idles without it)
 3. **Recommended companion**: [BiliBiliMedia](https://modrinth.com/mod/bilibili_media) — the Bilibili playback chain this mod primarily fixes
 
 ## Compatibility
 
 | Component | Version |
 |---|---|
-| Minecraft | 1.21.1 |
-| NeoForge | 21.1.x |
+| Minecraft | 1.21.1 (NeoForge) / 1.20.1 (Forge, Fabric) |
+| Loaders | NeoForge 21.1.x / Forge 47.x / Fabric Loader 0.14.21+ |
 | watermedia | **2.1.x** (tested 2.1.36) |
 | bilibili_media | 2.3 |
 
@@ -102,7 +109,7 @@ Also applies to any mod playing videos through watermedia 2.1 (netmusic, waterfr
 After launching, the log should contain:
 
 ```
-[BiliFix] v1.4.7 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] v1.4.8 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
 ```
 
@@ -121,7 +128,9 @@ Then play the video that previously crashed the game — it should no longer exi
 ## Building From Source
 
 ```powershell
-./build.ps1   # compile + run 85 regression tests + package
+./build.ps1           # compile + run 89 regression tests + package (NeoForge 1.21.1)
+./build-forge.ps1     # Forge 1.20.1 variant
+./build-fabric.ps1    # Fabric 1.20.1 variant
 ```
 
 The script auto-detects the JDK 21 (Minecraft runtime works) and the game

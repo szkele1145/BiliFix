@@ -1,4 +1,4 @@
-﻿# 跨加载器支持调研（2026-10-14 凌晨，待与项目所有者确认）
+# 跨加载器支持调研（2026-10-14 凌晨，待与项目所有者确认）
 
 ## 背景
 watermedia 2.1.x（libVLC 时代）支持：MC 1.16.5 / 1.18.2 / 1.19.2 / 1.20.1 / 1.21.1 / 1.21.5 × fabric / forge / neoforge。
@@ -72,3 +72,33 @@ forge universal jar 内）——若要支持 1.16.5 需从 universal jar 提取�
 watermedia 2.1.37 是**单一通用 jar**（同一文件覆盖 1.16.5–1.21.5 × fabric/forge/neoforge，
 实测含 `org.watermedia.core.tools.JarTool`）——BiliFix 的 Mixin 目标类在全区间稳定存在。
 多版本扩展的唯一变量是**加载器引导层（FML）差异**，即已查证的三个机制点 + 各版本 FML 字节码。
+
+## Fabric 1.20.1 变体：已构建（2026-10-18，构建级 + 字节码级验证完成）
+
+**入口解耦方案（已落地）**：
+- 核心改为 loader 无关：`BiliFixMod.init(Path gameDir, Path configDir)` 静态方法，
+  只依赖 JDK `Path` + slf4j。NeoForge/Forge 构造器与 Fabric entrypoint 都调用它，
+  三端共用同一份启动序列（顺序语义不变：注入目录 → 读配置 → 检测异常终止 → 注册守护）
+- `FmlBridge` 反射桥：FML 包名以字符串常量 + `Class.forName` 查找，编译期不需要
+  FML 符号；Fabric classpath 上两个候选包都不存在 → 返回 null →
+  `EnvironmentDiagnostics` 走 classpath 探测降级（只报存在性不报版本）
+- Fabric 入口 `dev.polaris_fix.bilifix.fabric.BiliFixFabric implements ModInitializer`，
+  `fabric.mod.json` 声明 entrypoint + mixins；游戏目录经
+  `FabricLoader.getInstance().getGameDir()/getConfigDir()` 注入核心（与调研第 3 点的
+  拆分思路一致，但比"系统属性"方案更直接）
+
+**构建管线（build-fabric.ps1，与 Forge 同型的暂存改写）**：
+- 暂存 `src\main\java` → 剥离 `@Mod` 注解 + 两个 FML import + 构造器改无参
+  （改写后断言无 `ModContainer|@Mod(|neoforged.fml` 残留，防回归），
+  加上原样的 `src\fabric\java`
+- mixins.json 暂存改写 `JAVA_21 → JAVA_17`（与 Forge 变体同因：实测 mixin-0.8.5 的
+  `CompatibilityLevel` 枚举只有 JAVA_16/17/18；Fabric 运行时的 sponge-mixin 同型）
+- 字节码交叉污染审计（ASCII 全字节扫描，非 `javap` 反汇编抽样）：
+  - fabric jar：无 `net/neoforged` / `net/minecraftforge` 内部名引用，
+    `net/fabricmc` 仅出现在 `BiliFixFabric.class`（entrypoint 必须引用 fabric API）
+  - forge / neoforge jar：无 `net/fabricmc` 引用——`src\fabric\*` 不会泄漏进它们
+- 运行时探针：FabricInitProbe（模拟 fabric-loader 缺位的裸 JVM）`RESULT=done`，
+  lock/config 落盘正确、FML 探测降级路径走通
+
+**状态：构建级 + 字节码级 + 探针级验证完成，未做真机实测**——
+与 Forge 变体同理，需在真实 Fabric 1.20.1 实例启动确认后再对外发布。

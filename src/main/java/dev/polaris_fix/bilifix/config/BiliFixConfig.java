@@ -30,10 +30,31 @@ public final class BiliFixConfig {
     /** 是否在日志打印完整参数对比 */
     public static boolean verbose = false;
 
+    /**
+     * 外部注入的配置目录（Fabric 侧用）。为 null 时回退到 FML 的 CONFIGDIR，
+     * 使同一份配置代码在 NeoForge/Forge 与 Fabric 上共用。
+     */
+    private static volatile Path injectedConfigDir;
+
     private BiliFixConfig() {}
 
+    /**
+     * 注入配置目录（Fabric entrypoint 调用，传 {@code FabricLoader.getInstance().getConfigDir()}）。
+     *
+     * <p>与 {@code CrashSentinel.setGameDir} 同一思路：Fabric 没有 FML，
+     * 直接引用 {@code FMLPaths} 会在运行时抛 {@code NoClassDefFoundError}；
+     * 注入后该引用不会被解析（{@code getstatic} 是惰性解析）。</p>
+     */
+    public static void setConfigDir(Path configDir) {
+        injectedConfigDir = configDir;
+    }
+
     public static Path configPath() {
-        Path configDir = net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get();
+        Path configDir = injectedConfigDir;
+        // FML 侧走反射桥：Fabric 的 classpath 上没有 net.neoforged.fml，直接引用会编译失败
+        if (configDir == null) configDir = dev.polaris_fix.bilifix.FmlBridge.fmlDir("CONFIGDIR");
+        // 最后兜底：注入与 FML 都不可用时退回工作目录，绝不因取不到路径而中断启动
+        if (configDir == null) configDir = Path.of("config");
         return configDir.resolve("bilifix.toml");
     }
 
@@ -66,6 +87,7 @@ public final class BiliFixConfig {
 
     /** hwDecoder 的最终 VLC 参数值："disable" 与 "none" 等价；未知值回退 none 并警告 */
     public static String hwDecoderValue() {
+        if (hwDecoder == null) return "none";
         return switch (hwDecoder.toLowerCase().trim()) {
             case "disable", "none", "off" -> "none";
             case "auto", "any" -> "any";
@@ -80,6 +102,7 @@ public final class BiliFixConfig {
 
     /** vout 的最终 VLC 参数值："original" 表示保留 watermedia 原始值；其他值标准化为小写 */
     public static String voutValue() {
+        if (vout == null) return null;
         String v = vout.toLowerCase().trim();
         return switch (v) {
             case "original", "keep" -> null; // null → 不替换

@@ -75,16 +75,23 @@ verbose = false
 
 ## 安装
 
-1. 下载 `BiliFix-x.x.x-mc1.21.1-neoforge.jar` 放进 `mods` 目录
-2. 需要 NeoForge 21.1（MC 1.21.1）；watermedia 2.1+（可选依赖，没有它本模组不做事）
+1. 下载对应加载器的 jar 放进 `mods` 目录：
+
+   | 加载器 / 游戏版本 | 文件名 |
+   |---|---|
+   | NeoForge 1.21.1 | `BiliFix-x.x.x-mc1.21.1-neoforge.jar` |
+   | Forge 1.20.1 | `BiliFix-x.x.x-mc1.20.1-forge.jar` |
+   | Fabric 1.20.1 | `BiliFix-x.x.x-mc1.20.1-fabric.jar` |
+
+2. 需要上表对应的加载器；watermedia 2.1+（可选依赖，没有它本模组不做事）
 3. **前置建议**：[哔哩哔哩WaterMedia兼容模组（BiliBiliMedia）](https://modrinth.com/mod/bilibili_media)——本模组修复的主要场景就是它的 B 站视频播放链路
 
 ## 兼容性
 
 | 组件 | 版本 |
 |---|---|
-| Minecraft | 1.21.1 |
-| NeoForge | 21.1.x |
+| Minecraft | 1.21.1（NeoForge）/ 1.20.1（Forge、Fabric） |
+| 加载器 | NeoForge 21.1.x / Forge 47.x / Fabric Loader 0.14.21+ |
 | watermedia | **2.1.x**（实测 2.1.36） |
 | bilibili_media | 2.3 |
 
@@ -97,7 +104,7 @@ verbose = false
 启动游戏后日志中应出现：
 
 ```
-[BiliFix] v1.4.7 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] v1.4.8 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] ==== BiliFix 环境诊断 ====
 [BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
@@ -113,7 +120,9 @@ verbose = false
 ## 从源码构建
 
 ```powershell
-./build.ps1   # 编译 + 85 项回归测试 + 打包
+./build.ps1            # 编译 + 89 项回归测试 + 打包（NeoForge 1.21.1）
+./build-forge.ps1      # Forge 1.20.1 变体
+./build-fabric.ps1     # Fabric 1.20.1 变体
 ```
 
 脚本自动探测 JDK 21（Minecraft 运行时即可）与游戏库目录。可用环境变量覆盖：BILIFIX_JAVAC、BILIFIX_LIBS，或参数 -WatermediaJar。

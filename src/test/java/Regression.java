@@ -3,9 +3,36 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.jar.*;
 
-/** BiliFix v1.1.0 回归测试：配置解析 + 参数替换（与 JarToolMixin/BiliFixConfig 相同逻辑） */
+/** BiliFix 回归测试：配置解析 + 参数替换（与 JarToolMixin/BiliFixConfig 相同逻辑，与当前 jar 版本同步） */
 public class Regression {
     static int passed = 0, failed = 0;
+
+    /**
+     * 版本号单一来源：从 mods.toml 读取。
+     * v1.4.8 教训——此前测试把版本硬编码（jar 名 + toml 断言），于是每次 bump 都要人工同步
+     * 第 5、第 6 个版本点，漏掉一个就让全套回归变红。改为动态解析后，bump 只需改描述符本身。
+     */
+    static final String SOURCE_VERSION = readSourceVersion();
+
+    static String readSourceVersion() {
+        String[] candidates = {
+            "src/main/resources/META-INF/neoforge.mods.toml",
+            "src/main/resources/META-INF/mods.toml"
+        };
+        for (String rel : candidates) {
+            try {
+                Path f = Paths.get(rel.replace('/', java.io.File.separatorChar));
+                if (!Files.exists(f)) continue;
+                java.util.regex.Matcher m = java.util.regex.Pattern
+                        .compile("(?s)\\[\\[mods\\]\\].*?version\\s*=\\s*\"([^\"]+)\"")
+                        .matcher(Files.readString(f, StandardCharsets.UTF_8));
+                if (m.find()) return m.group(1);
+            } catch (Exception ignored) {
+                // 落到下一个候选；全部失败时由下面的断言报错
+            }
+        }
+        return null;
+    }
 
     public static void main(String[] args) throws Exception {
         // ============ 1. 配置解析 ============
@@ -115,8 +142,10 @@ public class Regression {
                 g6.equals(Arrays.asList("--vout=original", "--avcodec-hw", "none")));
 
         // ============ 9.6. jar 包结构：必须包含类、mixin 清单、mods.toml、logo ============
-        Path neoJar = Paths.get("build", "BiliFix-1.4.7-mc1.21.1-neoforge.jar");
-        if (Files.exists(neoJar)) {
+        // v1.4.8：不再硬编码 jar 文件名（此前写死 1.4.7，bump 后 jar 名变了就静默 SKIP，
+        // 检查形同虚设）。改为扫描 build/ 下该 loader 的最新产物。
+        Path neoJar = pickJar("BiliFix-", "-mc1.21.1-neoforge.jar");
+        if (neoJar != null) {
             try (JarFile jf = new JarFile(neoJar.toFile())) {
                 check("jar: 含 bilifix/BiliFixMod.class",
                         jf.getJarEntry("dev/polaris_fix/bilifix/BiliFixMod.class") != null);
@@ -138,11 +167,28 @@ public class Regression {
         if (Files.exists(neoToml)) {
             String toml = Files.readString(neoToml, StandardCharsets.UTF_8);
             check("mods.toml: modId = \"bilifix\"", toml.contains("modId = \"bilifix\""));
-            check("mods.toml: version = \"1.4.7\"", toml.contains("version = \"1.4.7\""));
+            // v1.4.8: 不再断言字面量版本，改为"与单一来源一致"
+            check("mods.toml: version 与来源一致 (=" + SOURCE_VERSION + ")",
+                    SOURCE_VERSION != null && toml.contains("version = \"" + SOURCE_VERSION + "\""));
             check("mods.toml: 依赖 neoforge", toml.contains("modId = \"neoforge\""));
             check("mods.toml: [[mixins]] 存在", toml.contains("[[mixins]]"));
         } else {
             System.out.println("  [SKIP] mods.toml: 源文件缺失，跳过结构检查");
+        }
+
+        // ============ 9.8. 版本一致性：四处描述符必须同版本（v1.4.8 防漏改） ============
+        // 历史教训：bump 时要人工改 mods.toml / neoforge.mods.toml / fabric.mod.json /
+        // BiliFixMod.VERSION 四处，漏一处就会出现"jar 名与描述符版本不符"的发布事故。
+        check("版本来源: 可从 mods.toml 解析", SOURCE_VERSION != null);
+        if (SOURCE_VERSION != null) {
+            check("版本一致: mods.toml == neoforge.mods.toml",
+                    versionOf(Paths.get("src", "main", "resources", "META-INF", "mods.toml"))
+                            .equals(SOURCE_VERSION));
+            check("版本一致: fabric.mod.json == " + SOURCE_VERSION,
+                    versionOf(Paths.get("src", "fabric", "resources", "fabric.mod.json"))
+                            .equals(SOURCE_VERSION));
+            check("版本一致: BiliFixMod.VERSION == " + SOURCE_VERSION,
+                    BiliFixModVersion().equals(SOURCE_VERSION));
         }
         if (Files.exists(mixinsJson)) {
             String mixins = Files.readString(mixinsJson, StandardCharsets.UTF_8);
@@ -273,6 +319,33 @@ public class Regression {
         return ver != null && !ver.isBlank() && !ver.contains("${");
     }
 
+    /**
+     * 在 build/ 下挑选匹配后缀的 jar 产物（v1.4.8）。
+     * 此前 jar 名硬编码版本号，bump 之后路径失效、检查被静默 SKIP，
+     * 等于打包结构失去守卫。改为按"前缀 + loader 后缀"扫描并取最新修改的一个。
+     */
+    static Path pickJar(String prefix, String suffix) {
+        try {
+            for (Path dir : List.of(Paths.get("build"), Paths.get("build", "forge"),
+                                    Paths.get("build", "fabric"), Paths.get("build", "neoforge"))) {
+                if (!Files.isDirectory(dir)) continue;
+                try (var s = Files.list(dir)) {
+                    Path best = s.filter(Files::isRegularFile)
+                            .filter(p -> {
+                                String n = p.getFileName().toString();
+                                return n.startsWith(prefix) && n.endsWith(suffix);
+                            })
+                            .max(Comparator.comparingLong(p -> p.toFile().lastModified()))
+                            .orElse(null);
+                    if (best != null) return best;
+                }
+            }
+        } catch (Exception ignored) {
+            // 返回 null，由调用方走 SKIP 分支
+        }
+        return null;
+    }
+
     // ===== 与 CrashSentinel 相同的会话取证逻辑（v1.4.7） =====
     static final String SESSION_FILE = "bilifix-session.lock";
     static final String DIAGNOSTIC_FILE = "bilifix-diagnostic.txt";
@@ -302,7 +375,7 @@ public class Regression {
             Files.write(gameDir.resolve(CRASH_FILE),
                     ("== BiliFix 异常终止报告 ==\n"
                      + "detected at: now\n"
-                     + "version: 1.4.7\n"
+                     + "version: " + SOURCE_VERSION + "\n"
                      + "lock age: " + ageSec + "s\n\n"
                      + report + "-- end --\n").getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
@@ -402,6 +475,35 @@ public class Regression {
         int hash = raw.indexOf('#');
         if (hash >= 0) return raw.substring(0, hash).trim();
         return raw;
+    }
+
+    /**
+     * 从任意描述符文件里抽取版本号（v1.4.8）。
+     * 支持 toml（version = "x"）与 json（"version": "x"）两种写法；读不到返回空串。
+     */
+    static String versionOf(Path f) {
+        if (!Files.exists(f)) return "";
+        try {
+            String c = Files.readString(f, StandardCharsets.UTF_8);
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?m)(?:version\\s*=\\s*\"([^\"]+)\"|\"version\"\\s*:\\s*\"([^\"]+)\")")
+                    .matcher(c);
+            if (m.find()) return m.group(1) != null ? m.group(1) : m.group(2);
+        } catch (Exception ignored) { }
+        return "";
+    }
+
+    /** 从 BiliFixMod.java 源码里读 VERSION 常量（v1.4.8），避免把版本硬编码进测试。 */
+    static String BiliFixModVersion() {
+        Path f = Paths.get("src", "main", "java", "dev", "polaris_fix", "bilifix", "BiliFixMod.java");
+        if (!Files.exists(f)) return "";
+        try {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("VERSION\\s*=\\s*\"([^\"]+)\"")
+                    .matcher(Files.readString(f, StandardCharsets.UTF_8));
+            if (m.find()) return m.group(1);
+        } catch (Exception ignored) { }
+        return "";
     }
 
     static void check(String name, boolean ok) {

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "bilifix",
+  "version": "1.4.8",
+  "name": "BiliFix - Bilibili Media Crash Fix",
+  "description": "Fixes silent JVM crashes (exit code -1) caused by watermedia/libVLC D3D11VA hardware decoding when playing Bilibili videos in modpacks. Patches VLC launch arguments at runtime: forces software decoding by default (configurable).",
+  "authors": ["szkele1145"],
+  "contact": {
+    "homepage": "https://github.com/szkele1145/BiliFix",
+    "issues": "https://github.com/szkele1145/BiliFix/issues"
+  },
+  "license": "MIT",
+  "icon": "bilifix_logo.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["dev.polaris_fix.bilifix.fabric.BiliFixFabric"]
+  },
+  "mixins": ["bilifix.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "minecraft": "~1.20.1",
+    "java": ">=17"
+  },
+  "suggests": {
+    "watermedia": ">=2.1"
+  }
+}

@@ -38,21 +38,30 @@ import java.nio.file.Path;
 @Mod(BiliFixMod.MOD_ID)
 public class BiliFixMod {
     public static final String MOD_ID = "bilifix";
-    public static final String VERSION = "1.4.7";
+    public static final String VERSION = "1.4.8";
     public static final Logger LOGGER = LoggerFactory.getLogger("BiliFix");
 
     public BiliFixMod(ModContainer container) {
+        init(FmlBridge.fmlDir("GAMEDIR"), FmlBridge.fmlDir("CONFIGDIR"));
+    }
+
+    /**
+     * loader 无关的初始化核心：NeoForge/Forge 由构造器调用，Fabric 由 entrypoint 调用。
+     *
+     * <p>把核心逻辑集中在这里，是为了让三端共用同一份启动序列（顺序有语义：
+     * 先注入目录 → 再读配置 → 再检测上次异常终止 → 最后注册守护）。</p>
+     *
+     * @param gameDir   游戏目录（null = 不写取证文件，退化为无取证模式）
+     * @param configDir 配置目录（null = 由 configPath() 走 FML 兜底）
+     */
+    public static void init(Path gameDir, Path configDir) {
+        if (configDir != null) BiliFixConfig.setConfigDir(configDir);
+        if (gameDir != null) CrashSentinel.setGameDir(gameDir);
         BiliFixConfig.load();
         LOGGER.info("[BiliFix] v{} 已加载：watermedia VLC 硬解崩溃修复（策略: hw={}, vout={}）",
                 VERSION, BiliFixConfig.hwDecoder, BiliFixConfig.vout);
         EnvironmentDiagnostics.run(LOGGER);
         // 顺序关键：先检测上次是否异常终止（残留 lock），再注册本次的守护
-        Path gameDir;
-        try {
-            gameDir = net.neoforged.fml.loading.FMLPaths.GAMEDIR.get();
-        } catch (Throwable t) {
-            gameDir = null;
-        }
         if (gameDir != null) {
             String crash = CrashSentinel.detectUncleanShutdown(gameDir);
             if (crash != null) LOGGER.warn("[BiliFix] {}", crash);

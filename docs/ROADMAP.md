@@ -29,11 +29,15 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 
 ## Loader matrix
 
-- ✅ NeoForge 1.21.1 (primary, released: v1.4.7)
-- 🔄 Forge 1.20.1 - built & static-verified, awaiting a runtime test
-  (three FML divergences adapted, see docs/cross-loader-research.md)
-- ⏳ Fabric - needs entrypoint decoupling from FML (config loader +
-  ModContainer), medium effort
+- ✅ NeoForge 1.21.1 (primary, released: v1.4.7; v1.4.8 built & static-verified)
+- 🔄 Forge 1.20.1 - built & static-verified (`BiliFix-1.4.8-mc1.20.1-forge.jar`),
+  awaiting a runtime test (three FML divergences adapted incl. the mixin
+  `CompatibilityLevel` JAVA_21→JAVA_17 staging rewrite, proven against the real
+  mixin-0.8.5.jar; see docs/cross-loader-research.md)
+- 🔄 Fabric 1.20.1 - entrypoint decoupling **done** (loader-agnostic
+  `BiliFixMod.init(Path, Path)` + `BiliFixFabric implements ModInitializer`);
+  built & static-verified (`BiliFix-1.4.8-mc1.20.1-fabric.jar`), bytecode audit
+  shows zero cross-loader contamination, awaiting a runtime test
 - 💡 Forge 1.18.2 / 1.19.2 / 1.21.5 - FMLModContainer bytecode-verified
   identical in 1.18.2 and 1.20.1; the watermedia 2.1.x jar is universal across
   the whole range, so the fix logic needs zero changes - only per-version FML
@@ -41,7 +45,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 
 ## Infrastructure
 
-- ✅ One-command build (85 tests + jar integrity gate)
+- ✅ One-command build (89 tests + jar integrity gate)
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)

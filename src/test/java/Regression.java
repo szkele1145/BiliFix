@@ -352,6 +352,27 @@ public class Regression {
         Files.deleteIfExists(game.resolve(CRASH_FILE));
         Files.deleteIfExists(game);
 
+        // ============ 14. 事件容量上限（v1.4.8 并发守卫） ============
+        // CrashSentinel.record() 是"判满 → 丢最旧 → 追加"的复合序列；哪怕底层
+        // 集合线程安全（CopyOnWriteArrayList），这组 check-then-act 合起来不原子。
+        // recordHarden 经 Mixin 在媒体加载线程上被调用，并发进入是可能的。
+        //
+        // 本文件是独立镜像（Regression 不链接生产类，见文件头说明），所以无法直接
+        // 并发调用生产方法——镜像一份"已修复"的逻辑再测它等于什么都没测。这里改为
+        // 直接读生产源码，断言 record 声明了 synchronized：若有人删掉这个关键字，
+        // 上限就不再是硬保证，本用例必须 FAIL。
+        {
+            Path sentinel = Paths.get("src", "main", "java", "dev", "polaris_fix",
+                                      "bilifix", "CrashSentinel.java");
+            if (Files.exists(sentinel)) {
+                String src = Files.readString(sentinel, StandardCharsets.UTF_8);
+                check("并发: CrashSentinel.record 声明为 synchronized（上限硬保证）",
+                        src.matches("(?s).*public\\s+static\\s+synchronized\\s+void\\s+record\\s*\\(.*"));
+            } else {
+                System.out.println("  [SKIP] 并发: CrashSentinel.java 缺失，跳过源码断言");
+            }
+        }
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);

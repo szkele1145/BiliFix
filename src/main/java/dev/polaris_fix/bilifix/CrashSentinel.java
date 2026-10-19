@@ -109,8 +109,16 @@ public final class CrashSentinel {
         return mediaTouched;
     }
 
-    /** 记录生命周期事件（超过上限时丢弃最旧的） */
-    public static void record(String event) {
+    /**
+     * 记录生命周期事件（超过上限时丢弃最旧的）。
+     *
+     * <p>{@code synchronized} 是为了让容量上限成为<b>硬保证</b>：目标集合虽然是
+     * 线程安全的 {@link CopyOnWriteArrayList}，但"判满 → 丢最旧 → 追加"是一组
+     * check-then-act，单独看每一步都安全、合起来不是。{@link #recordHarden} 经
+     * Mixin 在媒体加载线程上被调用，并发进入是可能的。事件记录是低频路径
+     * （仅生命周期节点），加锁没有性能顾虑。</p>
+     */
+    public static synchronized void record(String event) {
         if (EVENTS.size() >= MAX_EVENTS) EVENTS.remove(0);
         EVENTS.add(Instant.now() + " | " + event);
     }
@@ -218,7 +226,7 @@ public final class CrashSentinel {
             sb.append("media touched: ").append(mediaTouched ? "yes" : "no").append('\n');
             sb.append("strategy: hw=").append(BiliFixConfig.hwDecoderValue())
               .append(", vout=").append(BiliFixConfig.voutValue()).append('\n');
-            sb.append("events (latest ").append(EVENTS.size()).append("):\n");
+            sb.append("events (").append(EVENTS.size()).append(" recorded):\n");
             for (String e : EVENTS) sb.append("  ").append(e).append('\n');
             sb.append("-- end --\n");
             Files.write(out, sb.toString().getBytes(StandardCharsets.UTF_8),

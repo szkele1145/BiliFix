@@ -110,6 +110,12 @@ public final class EnvironmentDiagnostics {
             // 类文件存在但依赖缺失等（NoClassDefFoundError / LinkageError）：
             // 这恰恰证明 mod 的 jar 在 classpath 上——存在性判定仍应为 true。
             // 捕 Throwable 与 run() 的"诊断绝不能崩游戏"同一原则。
+            //
+            // 探针实证（ForNameProbe2，运行时 classpath 故意不含依赖类）：
+            //   Class.forName("NeedsMissing", false, loader) → java.lang.NoClassDefFoundError
+            //   （initialize=false 同样会触发链接并抛错，不是 ClassNotFoundException）
+            // 只捕 ClassNotFoundException 会让这个 Error 冒泡到 modLine 的
+            // catch(Throwable) → 走"未安装"分支 → 已安装的 mod 被报成未安装。
             return true;
         }
     }

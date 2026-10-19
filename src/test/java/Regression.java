@@ -450,6 +450,12 @@ public class Regression {
             } else {
                 System.out.println("  [SKIP] 诊断: EnvironmentDiagnostics.java 缺失，跳过源码断言");
             }
+            // (b) 行为级证据：Class.forName 在"类文件存在、依赖缺失"时抛的是
+            // NoClassDefFoundError（Error）而非 ClassNotFoundException（Exception）——
+            // 这正是 §16 修复要兜住的情形。用一个"依赖被隔离"的类模拟：
+            // NeedsMissing extends MissingDep，MissingDep 不在本测试的 classpath 上。
+            check("诊断: 依赖缺失时 Class.forName 抛 NoClassDefFoundError 而非 CNFE",
+                    classForNameErrorIsNoClassDefFoundError());
         }
 
         System.out.println();
@@ -468,6 +474,69 @@ public class Regression {
     // ===== 与 modLine 相同的版本可用性判定 =====
     static boolean verUsable(String ver) {
         return ver != null && !ver.isBlank() && !ver.contains("${");
+    }
+
+    /**
+     * 行为级证据（§16）：{@code Class.forName(fqn, false, loader)} 在
+     * "类文件存在、但其父类/依赖不在 classpath 上"时抛的是
+     * {@link NoClassDefFoundError}（Error），**不是** {@link ClassNotFoundException}
+     * （Exception）。这正是 EnvironmentDiagnostics.checkClass 必须兜 Throwable 的原因：
+     * 只捕 CNFE 会让 Error 冒泡，已安装的 mod 被误报成"未安装"。
+     *
+     * <p>构造方式：用 JDK 自带的 javax.tools 编译器在临时目录里现场编译两个类——
+     * {@code MissingDep}（依赖）与 {@code NeedsMissing extends MissingDep}（被测类），
+     * 然后只把 {@code NeedsMissing} 所在的目录放进一个**隔离的 ClassLoader**，
+     * 依赖目录不进去 → 链接必然失败。</p>
+     *
+     * <p>不用子 ClassLoader 隔离而是靠运行期 classpath 是不行的：测试自身的
+     * classpath 里必然含有本测试的依赖类。</p>
+     *
+     * @return true = 实测抛出的确是 NoClassDefFoundError（而非 CNFE）
+     */
+    static boolean classForNameErrorIsNoClassDefFoundError() {
+        Path root = null;
+        try {
+            javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
+            if (compiler == null) return false;   // 无编译器环境（JRE）→ 不谎报
+            root = Files.createTempDirectory("bilifix-forname");
+            Path depDir = root.resolve("dep");
+            Path mainDir = root.resolve("main");
+            Files.createDirectories(depDir);
+            Files.createDirectories(mainDir);
+
+            Path depSrc = root.resolve("MissingDep.java");
+            Files.writeString(depSrc, "public class MissingDep { public int x; }", StandardCharsets.UTF_8);
+            Path needSrc = root.resolve("NeedsMissing.java");
+            Files.writeString(needSrc, "public class NeedsMissing extends MissingDep { }", StandardCharsets.UTF_8);
+
+            // 先编依赖，再把被测类对着依赖编（这样字节码里才有父类引用）
+            // 必须显式给 -d：javac 默认把 class 写在源文件旁边，否则隔离目录是空的
+            if (compiler.run(null, null, null, "-d", depDir.toString(), depSrc.toString()) != 0) return false;
+            if (compiler.run(null, null, null, "-d", mainDir.toString(),
+                            "-cp", depDir.toString(), needSrc.toString()) != 0) return false;
+            if (!Files.exists(mainDir.resolve("NeedsMissing.class"))) return false;
+
+            // 隔离加载：只有 mainDir 在 classpath 上，depDir 故意缺席
+            try (java.net.URLClassLoader iso = new java.net.URLClassLoader(
+                    new java.net.URL[]{ mainDir.toUri().toURL() }, null)) {
+                Class.forName("NeedsMissing", false, iso);
+                return false;   // 竟然加载成功了 → 前提不成立
+            } catch (ClassNotFoundException e) {
+                return false;   // 抛 CNFE → 与预期不符
+            } catch (NoClassDefFoundError e) {
+                return true;    // 预期：Error 而非 Exception
+            }
+        } catch (Throwable t) {
+            return false;       // 环境问题（无编译器/权限）→ 不谎报
+        } finally {
+            if (root != null) {
+                try (var s = Files.walk(root)) {
+                    s.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try { Files.deleteIfExists(p); } catch (Exception ignored) { }
+                    });
+                } catch (Exception ignored) { }
+            }
+        }
     }
 
     /**

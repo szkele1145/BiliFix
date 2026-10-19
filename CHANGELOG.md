@@ -27,11 +27,22 @@
 - `FmlBridge` 反射查 FML 不可用 → classpath 探测降级（运行时实证
   FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
 
+### 构建 / 部署
+- `deploy.ps1` 支持三变体：`-Variant neoforge|forge|fabric` 选择本地部署目标，
+  GitHub Release 资产同步改为**增量**（原先"先全删再传一个"会把另外两个变体的
+  资产一并删掉）；默认同步该版本所有已构建变体，未构建的跳过并提示
+- 修 Windows PowerShell 5.1 解析坑：无 BOM 的 .ps1 按 ANSI 解析，脚本内中文
+  实例名乱码导致语法错误 → `deploy.ps1` 改写为 UTF-8 with BOM
+
 ### 测试
+- 新增 §9.6b：1.20.1 两变体 jar 结构守卫——in-jar `bilifix.mixins.json` 必须是
+  `JAVA_17` 且**无 `JAVA_21` 残留**（防打包暂存改写被 `git checkout` 之类操作
+  静默丢失）；Forge 断言 MANIFEST `MixinConfigs`，Fabric 断言
+  `fabric.mod.json` entrypoint 与 `BiliFixFabric.class`（89 → 99 项）
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
-  > 19 项，故当前源码为 85（`./build.ps1` 实测"通过 85 / 失败 0"）。
+  > 19 项，v1.4.8 再加 10 项，故当前源码为 99（`./build.ps1` 实测"通过 99 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

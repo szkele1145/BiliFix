@@ -144,6 +144,16 @@
     临时晋级后闸门放行（随后还原）
   - ⚠️ `deploy.ps1` 是 UTF-8 **with BOM**：edit 工具会剥 BOM，改写后必须补回
     （本次已踩到：剥掉后中文实例名变乱码 → ParserError）
+- **Modrinth 上架链两处缺陷修复**（`pending-modrinth.ps1`）：
+  1. **自动发现只扫 `build\` 顶层**——Forge/Fabric 变体在 `build\forge\`、
+     `build\fabric\` 里，实测可见 1 个 / 实际 4 个：上轮"修复硬编码 loader"
+     并没真正修好发现逻辑，Forge/Fabric 变体**依然永远上不了架**。
+     改为**递归扫描**整个 `build\` 树（实测 1 → 4），上传用**发现时解析到的
+     实际路径**（旧代码拼 `build\<jarName>`，对非 neoforge 变体必然不存在）
+  2. **Modrinth 链没有发布闸门**——与 `deploy.ps1` 同一缺口：脚本会直接上传
+     未验证的版本。现在任一待上架版本未在 CHANGELOG 晋级即**整批拒绝**
+     （实测：真实 token 下 1.4.8 三个变体全被拦、退出码 1、零上传；
+     `-ForceRelease` 可有意越过）
 - 注入点冲突排查（字节级）：bilibili_media 2.3 的两个 mixin
   （`IHateWaterMediaMixin` → `org/watermedia/WaterMedia`、
   `NetworkAPIMixin` → `NetworkAPI`/`ILoader`）均**不碰 `JarTool`**

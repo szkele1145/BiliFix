@@ -1,4 +1,4 @@
-# Modrinth upload sync: auto-discovers every BiliFix-<ver>-mc<mc>-<loader>.jar in
+﻿# Modrinth upload sync: auto-discovers every BiliFix-<ver>-mc<mc>-<loader>.jar in
 # build\ that is not yet on Modrinth and uploads it, using the GitHub Release body
 # as the changelog. Reads a Modrinth PAT (Create + Edit Version scopes) from
 # ~\.dsh\mr.token - it is never committed.
@@ -19,6 +19,8 @@ $root = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvoca
 $tokenFile = Join-Path $env:USERPROFILE '.dsh\mr.token'
 $projectId = 'U6GLOyQ7'
 $proxy = 'http://127.0.0.1:65532'
+# Bypass the release gate (CHANGELOG promotion) - deliberate overrides only.
+$ForceRelease = $args -contains '-ForceRelease'
 
 if (-not (Test-Path $tokenFile)) { throw "token file not found: $tokenFile - place a fresh Modrinth PAT there first" }
 $mrToken = (Get-Content $tokenFile -Raw).Trim()
@@ -50,10 +52,17 @@ if ($manualPending) {
 } else {
     # auto-discover every variant jar in build\ that is missing from Modrinth.
     # Filename is the source of truth: BiliFix-<ver>-mc<mcver>-<loader>.jar
+    #
+    # v1.4.8 fix: the scan used to look at build\ TOP LEVEL only, while the Forge
+    # and Fabric variants live in build\forge\ and build\fabric\. Measured:
+    # 1 jar visible at top level vs 4 actually built -> the Forge/Fabric variants
+    # could still never be published, even after the hardcoded-loader fix.
+    # Now the whole build tree is scanned recursively.
     $ghTokenFile = Join-Path $env:USERPROFILE '.dsh\gh.token'
     $ghToken = if (Test-Path $ghTokenFile) { (Get-Content $ghTokenFile -Raw).Trim() }
     $ghRels = if ($ghToken) { Invoke-RestMethod -Uri 'https://api.github.com/repos/szkele1145/BiliFix/releases' -Headers @{ Authorization = "Bearer $ghToken"; 'User-Agent' = 'BiliFix' } -Proxy $proxy }
-    $pending = Get-ChildItem (Join-Path $root 'build') -Filter 'BiliFix-*.jar' -ErrorAction SilentlyContinue | ForEach-Object {
+    $buildDir = Join-Path $root 'build'
+    $pending = Get-ChildItem $buildDir -Filter 'BiliFix-*.jar' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
         if ($_.BaseName -notmatch '^BiliFix-(.+)-mc(\d+\.\d+(?:\.\d+)?)-(neoforge|forge|fabric)$') {
             Write-Warning "$($_.Name): filename does not match BiliFix-<ver>-mc<mcver>-<loader>.jar - skipping"
             return
@@ -63,7 +72,8 @@ if ($manualPending) {
         if ($existingKeys -contains $key) { return }
         $rel = $ghRels | Where-Object { $_.tag_name -eq "v$ver" }
         $body = if ($rel) { ($rel.body -split "`n" | Where-Object { $_ -notmatch '^#' -and $_.Trim() }) -join ' ' } else { "See the GitHub release notes for v$ver." }
-        @{ ver = $ver; mcver = $mcver; loader = $loader; changelog = $body; featured = $false }
+        # keep the resolved path so the upload reads the very jar that was discovered
+        @{ ver = $ver; mcver = $mcver; loader = $loader; changelog = $body; featured = $false; path = $_.FullName }
     }
 }
 
@@ -72,10 +82,42 @@ if (-not $pending) { Write-Host 'Nothing pending - Modrinth is up to date with b
 $vers = ($pending | ForEach-Object { "$($_.ver)/$($_.loader)" }) -join ', '
 Write-Host "Discovered pending versions: $vers" -ForegroundColor Cyan
 
+# ---- release gate (v1.4.8) ----
+# Publishing to Modrinth is shipping. The project rule: CHANGELOG "## Unreleased"
+# may only be promoted to "## <version>" after the in-game launch validation
+# passed on BOTH loaders. Uploading an unvalidated build would put it in front
+# of users. Every pending version must therefore be promoted in CHANGELOG.md.
+# -ForceRelease bypasses this deliberately.
+$unpromoted = @()
+$clPath = Join-Path $root 'CHANGELOG.md'
+$cl = [System.IO.File]::ReadAllText($clPath, [System.Text.Encoding]::UTF8)
+foreach ($p in $pending) {
+    $esc = [regex]::Escape($p.ver)
+    if (-not [regex]::IsMatch($cl, "(?m)^##\s+$esc\b")) { $unpromoted += "$($p.ver)/$($p.loader)" }
+}
+if ($unpromoted.Count -gt 0 -and -not $ForceRelease) {
+    throw ("these versions are not promoted in CHANGELOG.md: " + ($unpromoted -join ', ') +
+           "`n  Publishing to Modrinth means shipping; a version may only be released" +
+           "`n  after the in-game launch validation passed (see docs/verification-checklist.md)." +
+           "`n  Promote CHANGELOG '## Unreleased' -> '## <version>' first," +
+           "`n  or pass -ForceRelease if you really mean to publish now.")
+}
+if ($unpromoted.Count -gt 0) {
+    Write-Warning "publishing unpromoted versions due to -ForceRelease: $($unpromoted -join ', ')" -ForegroundColor Red
+}
+
 foreach ($p in $pending) {
     $jarName = "BiliFix-$($p.ver)-mc$($p.mcver)-$($p.loader).jar"
-    $jarPath = Join-Path $root "build\$jarName"
-    if (-not (Test-Path $jarPath)) { Write-Warning "$jarName not in build/ - skipping"; continue }
+    # Use the path that discovery actually resolved. The old code rebuilt
+    # "build\<jarName>", which only exists for the neoforge variant - the Forge
+    # and Fabric jars live in build\forge\ and build\fabric\.
+    $jarPath = if ($p.path -and (Test-Path $p.path)) { $p.path } else { Join-Path $root "build\$jarName" }
+    if (-not (Test-Path $jarPath)) {
+        # fall back: search the whole build tree for this exact jar name
+        $found = Get-ChildItem (Join-Path $root 'build') -Filter $jarName -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $jarPath = $found.FullName }
+        else { Write-Warning "$jarName not found under build\ - skipping"; continue }
+    }
 
     # skip if this exact (version, loader) pair is already on Modrinth
     if ($existingKeys -contains "$($p.ver)|$($p.loader)") { Write-Host "$($p.ver)/$($p.loader): already on Modrinth - skip" -ForegroundColor Yellow; continue }

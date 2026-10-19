@@ -3,7 +3,7 @@
 # Why this variant needs a staging step at all:
 #   src/main/java/* is compiled against NeoForge by build.ps1, and the class
 #   dev.polaris_fix.bilifix.BiliFixMod carries @Mod + a (ModContainer) constructor.
-#   Neither org.slf4j-less Fabric nor fabric-loader provides net.neoforged.fml.*,
+#   Neither fabric-loader nor the Minecraft runtime provides net.neoforged.fml.*,
 #   so javac would fail on the missing symbols. We therefore compile a *staged copy*
 #   of src/main/java with the two FML imports + the @Mod annotation + the ModContainer
 #   constructor parameter stripped, plus the real Fabric entrypoint from src/fabric/java.

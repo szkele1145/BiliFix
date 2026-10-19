@@ -42,6 +42,12 @@
   修复后 `RESULT=created`，628 bytes）
 
 ### 构建 / 部署
+- `pending-modrinth.ps1` 支持三变体：此前只发现 `-mc1.21.1-neoforge.jar` 且
+  `game_versions`/`loaders` 写死，Forge/Fabric 变体永远进不了发现列表。现在从
+  文件名 `BiliFix-<ver>-mc<mcver>-<loader>.jar` 解析三要素，标签由解析结果驱动；
+  去重键改为 version_number+loader（Modrinth 允许同一 version_number 每 loader
+  一条，JEI 先例；老键会把第二个变体误判为已上传）。标签合法性已对照
+  `/v2/tag/loader` 公开 API 实证：`neoforge`/`forge`/`fabric` 均合法
 - `deploy.ps1` 支持三变体：`-Variant neoforge|forge|fabric` 选择本地部署目标，
   GitHub Release 资产同步改为**增量**（原先"先全删再传一个"会把另外两个变体的
   资产一并删掉）；默认同步该版本所有已构建变体，未构建的跳过并提示

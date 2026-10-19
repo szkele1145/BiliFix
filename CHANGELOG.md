@@ -58,8 +58,9 @@
 - 新增 §9.6b：1.20.1 两变体 jar 结构守卫——in-jar `bilifix.mixins.json` 必须是
   `JAVA_17` 且**无 `JAVA_21` 残留**（防打包暂存改写被 `git checkout` 之类操作
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
-  依赖语法已转 `mandatory=`，Fabric 断言 `fabric.mod.json` entrypoint 与
-  `BiliFixFabric.class`（89 → 103 项）
+  依赖语法已转 `mandatory=`、jar 内 `BiliFixMod.class` 无 `ModContainer` 残留
+  （无参构造改写生效），Fabric 断言 `fabric.mod.json` entrypoint 与
+  `BiliFixFabric.class`（89 → 107 项）
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
@@ -70,7 +71,8 @@
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
   > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
-  > 守卫与 §15 配置目录守卫，故当前源码为 105（`./build.ps1` 实测"通过 105 / 失败 0"）。
+  > 守卫、§15 配置目录守卫与 Forge 构造器字节级守卫，故当前源码为 107
+  > （`./build.ps1` 实测"通过 107 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

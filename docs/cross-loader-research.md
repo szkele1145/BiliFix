@@ -102,3 +102,32 @@ watermedia 2.1.37 是**单一通用 jar**（同一文件覆盖 1.16.5–1.21.5 �
 
 **状态：构建级 + 字节码级 + 探针级验证完成，未做真机实测**——
 与 Forge 变体同理，需在真实 Fabric 1.20.1 实例启动确认后再对外发布。
+
+## Mixin 覆盖完备性复审（2026-10-20 00:00，字节码级）
+
+复审问题：`JarTool` 除 mixin 目标 `readArray(String)` 外还有
+`readArrayAndParse(String, Map)`——若某版本走后者，修复会**静默失效**。
+用真实 jar（2.1.36 与 2.1.37）做字节级查证，结论：**覆盖完备，无需改动**。
+
+1. **调用方普查**（ASCII 全字节扫描所有 `.class` 的常量池）：
+   - 含 `readArray` 的类：`org/watermedia/api/player/PlayerAPI`、
+     `JarTool`、`JarTool$3`、`JarTool$4`
+   - 含 `readArrayAndParse` 的类：仅 `JarTool` 自身与 `JarTool$3`（内部自用）
+   - → 外部调用方只有 `PlayerAPI`，两版本（2.1.36 / 2.1.37）结果一致
+2. **参数表读取方普查**（搜常量 `arguments`）：
+   - `PlayerAPI` —— 真正读 `videolan/arguments.json`（Windows）
+     与 `videolan/arguments_linux.json`（Linux 分支）
+   - `UserProvider` —— 仅消息文案 "Not user path defined on JVM arguments"，
+     与参数表无关（假阳性）
+3. **调用点反汇编确认**（`javap -c org.watermedia.api.player.PlayerAPI`）：
+   ```
+   142: ldc_w  #261  // String videolan/arguments.json
+   151: invokestatic #265 // Method org/watermedia/core/tools/JarTool.readArray:(Ljava/lang/String;)[Ljava/lang/String;
+   161: invokestatic #269 // Method registerFactory:(...)Lorg/watermedia/videolan4j/factory/MediaPlayerFactory;
+   ```
+   → 播放链确实经过 `readArray(String)`，即本模组 mixin 的目标方法。
+
+**范围说明**：Linux 的 `arguments_linux.json` 不在本模组范围内——修复针对的是
+Windows 专属的 D3D11VA 硬解崩溃路径；Linux 无 D3D11VA，也就没有该崩溃。
+**兜底**：若未来参数表缺少 `--avcodec-hw` / `--vout`，mixin 会主动追加安全值
+（见 `JarToolMixin` 的 `sawHw` / `sawVout` 分支），不会静默失效。

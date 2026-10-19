@@ -63,6 +63,28 @@ public final class CrashSentinel {
     /** 本次会话是否真的执行过参数加固（= 用户确实播放过媒体） */
     private static volatile boolean mediaTouched = false;
 
+    /**
+     * 取证抑制开关：为 true 时 {@link #recordHarden} 不置 {@code mediaTouched}、
+     * 不递增 {@code HARDEN_COUNT}、也不写事件。
+     *
+     * <p><b>为什么需要</b>（v1.4.8 功能自检引入的取证污染）：启动自检会真的调用
+     * 一次 {@code JarTool.readArray}，这会触发 mixin → {@code recordHarden} →
+     * {@code mediaTouched = true}。于是用户<b>根本没播放过媒体</b>，诊断文件却写
+     * {@code media touched: yes}——直接摧毁 v1.4.7 建立的核心取证语义
+     * （"media touched 用于区分『真播放过媒体』与『只是开着游戏』"）。
+     * 崩溃排查时这个字段一旦撒谎，结论就不可信了。</p>
+     */
+    private static volatile boolean suppressForensics = false;
+
+    /**
+     * 设置取证抑制（自检类调用必须成对使用 try/finally 复位）。
+     *
+     * @param suppress true = 抑制取证计数与 mediaTouched
+     */
+    public static void setForensicsSuppressed(boolean suppress) {
+        suppressForensics = suppress;
+    }
+
     /** 生命周期事件（容量截断，防长会话内存增长） */
     private static final List<String> EVENTS = new CopyOnWriteArrayList<>();
 
@@ -96,6 +118,7 @@ public final class CrashSentinel {
 
     /** 记录一次 Mixin 参数加固（fullArgs 非空时附带完整参数序列） */
     public static void recordHarden(int originalCount, int newCount, String fullArgs) {
+        if (suppressForensics) return;   // 自检调用：不污染取证数据（见 suppressForensics javadoc）
         HARDEN_COUNT.incrementAndGet();
         mediaTouched = true;
         String event = "VLC args hardened: " + originalCount + " -> " + newCount + " items"

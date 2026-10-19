@@ -533,6 +533,27 @@ public class Regression {
                 // (e) 探测用的资源名必须与 PlayerAPI 实际读取的一致
                 check("守卫: 功能自检资源名与 PlayerAPI 一致",
                         g.contains("\"videolan/arguments.json\""));
+                // (f) **取证污染守卫**：功能自检会真的调用 readArray → 触发 mixin →
+                //     recordHarden → mediaTouched=true。用户根本没播放媒体也会被
+                //     记成"media touched: yes"，摧毁 v1.4.7 的核心取证语义。
+                //     必须有抑制开关，且必须在 finally 中复位（否则用户之后真播放
+                //     媒体时，取证数据会被永久抑制）。
+                Path sentinelSrc = Paths.get("src", "main", "java", "dev", "polaris_fix",
+                                             "bilifix", "CrashSentinel.java");
+                if (Files.exists(sentinelSrc)) {
+                    String s = Files.readString(sentinelSrc, StandardCharsets.UTF_8);
+                    check("取证: CrashSentinel 提供取证抑制开关",
+                            s.contains("setForensicsSuppressed(boolean"));
+                    check("取证: recordHarden 在抑制态下直接返回",
+                            s.matches("(?s).*public\\s+static\\s+void\\s+recordHarden\\s*\\(.*?"
+                                    + "\\)\\s*\\{\\s*if\\s*\\(\\s*suppressForensics\\s*\\)\\s*return;.*"));
+                } else {
+                    System.out.println("  [SKIP] 取证: CrashSentinel.java 缺失，跳过源码断言");
+                }
+                check("取证: 功能自检成对使用抑制开关（进入+finally 复位）",
+                        g.matches("(?s).*setForensicsSuppressed\\s*\\(\\s*true\\s*\\).*"));
+                check("取证: 功能自检在 finally 中复位抑制",
+                        g.matches("(?s).*finally\\s*\\{[^}]*setForensicsSuppressed\\s*\\(\\s*false\\s*\\).*"));
             } else {
                 System.out.println("  [SKIP] 守卫: MixinTargetGuard.java 缺失，跳过源码断言");
             }

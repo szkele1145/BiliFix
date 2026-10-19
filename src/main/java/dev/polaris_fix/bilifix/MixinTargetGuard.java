@@ -143,6 +143,10 @@ public final class MixinTargetGuard {
      *         false = 参数仍是原始危险值（注入未生效）或无法判定
      */
     public static boolean functionalProbe(Logger logger) {
+        // 取证抑制：本次调用会真的触发 mixin → recordHarden → mediaTouched=true。
+        // 若不抑制，用户根本没播放媒体也会被记成"media touched: yes"，
+        // 摧毁 v1.4.7 建立的核心取证语义。try/finally 保证成对复位。
+        dev.polaris_fix.bilifix.CrashSentinel.setForensicsSuppressed(true);
         try {
             Class<?> cls = Class.forName(TARGET_CLASS, true, MixinTargetGuard.class.getClassLoader());
             Method readArray = cls.getDeclaredMethod(TARGET_METHOD, String.class);
@@ -185,6 +189,9 @@ public final class MixinTargetGuard {
             // 探测本身失败（资源缺、链接错…）：不干扰游戏，只在 debug 级留痕
             logger.debug("[BiliFix] 功能自检异常（忽略）: {}", t.toString());
             return false;
+        } finally {
+            // 必须复位：否则之后用户真的播放媒体时，取证数据会被永久抑制
+            dev.polaris_fix.bilifix.CrashSentinel.setForensicsSuppressed(false);
         }
     }
 

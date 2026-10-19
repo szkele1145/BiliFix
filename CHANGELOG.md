@@ -60,7 +60,7 @@
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
   依赖语法已转 `mandatory=`、jar 内 `BiliFixMod.class` 无 `ModContainer` 残留
   （无参构造改写生效），Fabric 断言 `fabric.mod.json` entrypoint 与
-  `BiliFixFabric.class`（89 → 124 项）
+  `BiliFixFabric.class`（89 → 128 项）
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
@@ -77,7 +77,7 @@
   ClassLoader 场景，断言 `Class.forName(fqn, false, loader)` 实际抛出的确是
   `NoClassDefFoundError`（探针 ForNameProbe2 实证 `initialize=false` 同样触发
   链接失败）。负向测试：删 Throwable 兜底、或破坏 NCDFE 判定分支 → `[FAIL]`、
-  退出码 1（89 → 124 项）
+  退出码 1（89 → 128 项）
 - 新增 §17：配置三字段必须 `volatile`——`hwDecoder` / `vout` / `verbose` 由主线程
   的 `load()` 写入，而读方 `JarToolMixin` 经 `PlayerAPI.start() → readArray`
   可能在 watermedia 的**工作线程**上执行。JLS §17.4.5：两线程间若无
@@ -118,6 +118,18 @@
     （NOT-HARDENED），不误报
   - 回归 §18 扩展：功能自检接线 + 比对配置期望值 + 资源名与 PlayerAPI 一致
     （javap 实证）。负向测试：删掉 functionalProbe 调用 → `[FAIL]`、退出码 1
+- **修复功能自检引入的取证污染**——上条的功能自检会真的调用 `readArray`，
+  这会触发 mixin → `recordHarden` → `mediaTouched = true`。于是用户**根本没播放
+  过媒体**，诊断文件却写 `media touched: yes`，直接摧毁 v1.4.7 建立的核心取证
+  语义（"media touched 用于区分『真播放过媒体』与『只是开着游戏』"）。
+  崩溃排查时这个字段一旦撒谎，结论就不可信。
+  - 新增 `CrashSentinel.setForensicsSuppressed(boolean)`：抑制态下 `recordHarden`
+    直接返回（不计数、不置 `mediaTouched`、不写事件）
+  - `functionalProbe` 进入时置 true、**在 `finally` 中复位**——必须复位，否则
+    用户之后真的播放媒体时，取证数据会被永久抑制（症状与原缺陷等价）
+  - 探针实证：抑制态调用 → `mediaTouched=false`；复位后调用 → `mediaTouched=true`
+  - 回归 §19：4 条守卫（提供开关 / recordHarden 早退 / 成对使用 / finally 复位）。
+    负向测试 ×2：去掉抑制检查 → `[FAIL]`；去掉 finally 复位 → `[FAIL]`，均退出码 1
 - 注入点冲突排查（字节级）：bilibili_media 2.3 的两个 mixin
   （`IHateWaterMediaMixin` → `org/watermedia/WaterMedia`、
   `NetworkAPIMixin` → `NetworkAPI`/`ILoader`）均**不碰 `JarTool`**
@@ -127,8 +139,9 @@
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
   > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
   > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫、§16 诊断探测守卫、
-  > §17 配置可见性守卫与 §18 Mixin 目标守卫，故当前源码为 124
-  > （`./build.ps1` 实测"通过 124 / 失败 0"）。
+  > §17 配置可见性守卫、§18 Mixin 目标守卫与 §19 取证污染守卫，
+  > 故当前源码为 128
+  > （`./build.ps1` 实测"通过 128 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

@@ -95,7 +95,7 @@ The startup diagnostics also report the exact companion-chain versions
 |---|---|
 | Minecraft | 1.21.1 (NeoForge) / 1.20.1 (Forge, Fabric) |
 | Loaders | NeoForge 21.1.x / Forge 47.x / Fabric Loader 0.14.21+ |
-| watermedia | **2.1.x** (tested 2.1.36) |
+| watermedia | **2.1.x** (tested 2.1.37) |
 | bilibili_media | 2.3 |
 
 Also applies to any mod playing videos through watermedia 2.1 (netmusic, waterframes, etc.), not just Bilibili.
@@ -114,8 +114,9 @@ After launching, the log should contain:
 ```
 
 > The argument counts in parentheses come from watermedia and vary by its version
-> (18 with 2.1.36). What matters is that both hardening entries were replaced and
-> the total count is unchanged — no argument was dropped.
+> (18 with 2.1.36/2.1.37 — `javap` confirms `JarTool.readArray(String)` has the
+> same signature in both). What matters is that both hardening entries were
+> replaced and the total count is unchanged — no argument was dropped.
 
 Then play the video that previously crashed the game — it should no longer exit.
 

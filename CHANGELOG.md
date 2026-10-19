@@ -60,19 +60,26 @@
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
   依赖语法已转 `mandatory=`、jar 内 `BiliFixMod.class` 无 `ModContainer` 残留
   （无参构造改写生效），Fabric 断言 `fabric.mod.json` entrypoint 与
-  `BiliFixFabric.class`（89 → 107 项）
+  `BiliFixFabric.class`（89 → 112 项）
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
 - 新增 §15：默认配置文件必须能自建父目录——源码断言保留
   `Files.createDirectories(parent)`，并在临时目录上真功能验证父目录缺失也能写出
   （同样做过负向测试：删掉该行时 `[FAIL]`、退出码 1）
+- 新增 §16：`checkClass` 必须有 `Throwable` 兜底——类文件存在但静态依赖缺失时
+  `Class.forName` 抛 `NoClassDefFoundError`（Error，非 Exception），原实现只捕
+  `ClassNotFoundException` 会让错误冒泡 → modLine 误报"未安装"，恰好抹掉
+  classpath 回退探测存在的意义。修复：兜底 `catch (Throwable) → return true`
+  （存在性成立）。同时断言三个 mod 探测类名与真实 jar 内入口类一致（本机
+  watermedia 2.1.36 / bilibili_media 2.3 / waterframes 2.1.23 jar 实测）。
+  负向测试：删掉 Throwable 兜底 → `[FAIL]`、退出码 1（89 → 112 项）
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
   > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
-  > 守卫、§15 配置目录守卫与 Forge 构造器字节级守卫，故当前源码为 107
-  > （`./build.ps1` 实测"通过 107 / 失败 0"）。
+  > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫与 §16 诊断探测守卫，
+  > 故当前源码为 112（`./build.ps1` 实测"通过 112 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

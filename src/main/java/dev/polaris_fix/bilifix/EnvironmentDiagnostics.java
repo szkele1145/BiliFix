@@ -101,10 +101,16 @@ public final class EnvironmentDiagnostics {
 
     private static boolean checkClass(String fqn) {
         try {
+            // initialize=false：只验证类可加载，不跑 <clinit>，静态依赖不会被执行
             Class.forName(fqn, false, EnvironmentDiagnostics.class.getClassLoader());
             return true;
         } catch (ClassNotFoundException e) {
             return false;
+        } catch (Throwable t) {
+            // 类文件存在但依赖缺失等（NoClassDefFoundError / LinkageError）：
+            // 这恰恰证明 mod 的 jar 在 classpath 上——存在性判定仍应为 true。
+            // 捕 Throwable 与 run() 的"诊断绝不能崩游戏"同一原则。
+            return true;
         }
     }
 

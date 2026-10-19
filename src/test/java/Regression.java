@@ -422,6 +422,36 @@ public class Regression {
             }
         }
 
+        // ============ 16. classpath 探测不得因依赖缺失误报"未安装"（v1.4.8） ============
+        // checkClass 用 Class.forName 判断 mod 是否存在，但只捕 ClassNotFoundException。
+        // 若类文件在、其静态依赖缺失（Fabric 侧无 FML 时正是这种局面），
+        // Class.forName 抛的是 NoClassDefFoundError / LinkageError（Error 而非 Exception）
+        // → 未捕获 → 冒泡到 modLine 的 catch(Throwable) → 走"未安装"分支：
+        // **已安装的 mod 被报成未安装**，正是 classpath 回退路径存在的意义被抹掉。
+        // 断言源码里 checkClass 必须有 Throwable 兜底且返回 true（存在性成立）。
+        {
+            Path diagSrc = Paths.get("src", "main", "java", "dev", "polaris_fix",
+                                     "bilifix", "EnvironmentDiagnostics.java");
+            if (Files.exists(diagSrc)) {
+                String src = Files.readString(diagSrc, StandardCharsets.UTF_8);
+                check("诊断: checkClass 捕获 ClassNotFoundException",
+                        src.matches("(?s).*catch\\s*\\(\\s*ClassNotFoundException.*"));
+                // Throwable 兜底：Error 也要吞掉，否则"类在、依赖缺"被判成不存在
+                check("诊断: checkClass 有 Throwable 兜底（Error 不当作未安装）",
+                        src.matches("(?s).*catch\\s*\\(\\s*ClassNotFoundException[^)]*\\)\\s*\\{[^}]*\\}"
+                                  + "\\s*catch\\s*\\(\\s*Throwable.*"));
+                // 三个 classpath 探测类名必须与真实 jar 内的入口类一致（本机 jar 实测）
+                check("诊断: watermedia 探测类名正确",
+                        src.contains("\"org.watermedia.WaterMedia\""));
+                check("诊断: bilibili_media 探测类名正确",
+                        src.contains("\"dev.polaris_light.bilibili_media.BiliBiliMedia\""));
+                check("诊断: waterframes 探测类名正确",
+                        src.contains("\"me.srrapero720.waterframes.WaterFrames\""));
+            } else {
+                System.out.println("  [SKIP] 诊断: EnvironmentDiagnostics.java 缺失，跳过源码断言");
+            }
+        }
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);

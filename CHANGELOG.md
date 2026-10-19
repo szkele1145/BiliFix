@@ -27,6 +27,14 @@
 - `FmlBridge` 反射查 FML 不可用 → classpath 探测降级（运行时实证
   FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
 
+### 修复
+- `CrashSentinel.record()` 的事件容量控制是"判满 → 丢最旧 → 追加"这组
+  check-then-act：底层 `CopyOnWriteArrayList` 每步线程安全，合起来不是。
+  `recordHarden` 经 Mixin 在媒体加载线程上被调用，并发进入会让 `MAX_EVENTS`
+  上限被突破（事件列表缓慢膨胀）→ 改为 `synchronized`（低频生命周期路径）
+- 退出快照措辞：`events (latest N)` 的 N 实为**已记录条数**而非最新条数，
+  会误导排查者 → 改为 `events (N recorded)`
+
 ### 构建 / 部署
 - `deploy.ps1` 支持三变体：`-Variant neoforge|forge|fabric` 选择本地部署目标，
   GitHub Release 资产同步改为**增量**（原先"先全删再传一个"会把另外两个变体的
@@ -37,13 +45,17 @@
 ### 测试
 - 新增 §9.6b：1.20.1 两变体 jar 结构守卫——in-jar `bilifix.mixins.json` 必须是
   `JAVA_17` 且**无 `JAVA_21` 残留**（防打包暂存改写被 `git checkout` 之类操作
-  静默丢失）；Forge 断言 MANIFEST `MixinConfigs`，Fabric 断言
-  `fabric.mod.json` entrypoint 与 `BiliFixFabric.class`（89 → 102 项）
+  静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
+  依赖语法已转 `mandatory=`，Fabric 断言 `fabric.mod.json` entrypoint 与
+  `BiliFixFabric.class`（89 → 103 项）
+- 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
+  （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
+  断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
-  > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫与 Forge 三处机制差异断言，故当前源码
-  > 为 102（`./build.ps1` 实测"通过 102 / 失败 0"）。
+  > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言与 §14 并发
+  > 守卫，故当前源码为 103（`./build.ps1` 实测"通过 103 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

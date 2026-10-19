@@ -10,9 +10,10 @@ import java.util.List;
  *
  * 检测项：
  * 1. 前置链路版本感知：watermedia / bilibili_media / waterframes（FML ModList 运行时 API）
- * 2. JVM 架构与内存（32 位 JVM / 低内存也是原生崩溃风险因素）
+ * 2. JVM 架构（32 位 JVM 本身也是原生崩溃风险因素）
  * 3. 操作系统版本
  * 4. GPU 型号（Windows 注册表查询；崩溃与驱动相关，帮助定位）
+ * 5. 可用内存上限（解码吃紧时会放大原生层问题）
  */
 public final class EnvironmentDiagnostics {
     private EnvironmentDiagnostics() {}

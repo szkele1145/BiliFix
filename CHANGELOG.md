@@ -34,6 +34,12 @@
   上限被突破（事件列表缓慢膨胀）→ 改为 `synchronized`（低频生命周期路径）
 - 退出快照措辞：`events (latest N)` 的 N 实为**已记录条数**而非最新条数，
   会误导排查者 → 改为 `events (N recorded)`
+- `BiliFixConfig.writeDefault()` 从不创建父目录：全新实例、或 Fabric 侧注入的
+  `FabricLoader.getConfigDir()` 尚不存在时，`Files.write` 抛
+  `NoSuchFileException`，被 `load()` 的 `catch` 吞成一条 warning——加固本身仍
+  正确，但默认配置文件永不落盘，用户无从调整 → 写出前先 `createDirectories`
+  （探针 `out/cfgdir-probe/ConfigDirProbe.java` 实证：修复前 `RESULT=NOT-CREATED`，
+  修复后 `RESULT=created`，628 bytes）
 
 ### 构建 / 部署
 - `deploy.ps1` 支持三变体：`-Variant neoforge|forge|fabric` 选择本地部署目标，
@@ -51,11 +57,14 @@
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
+- 新增 §15：默认配置文件必须能自建父目录——源码断言保留
+  `Files.createDirectories(parent)`，并在临时目录上真功能验证父目录缺失也能写出
+  （同样做过负向测试：删掉该行时 `[FAIL]`、退出码 1）
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
-  > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言与 §14 并发
-  > 守卫，故当前源码为 103（`./build.ps1` 实测"通过 103 / 失败 0"）。
+  > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
+  > 守卫与 §15 配置目录守卫，故当前源码为 105（`./build.ps1` 实测"通过 105 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

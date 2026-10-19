@@ -5,7 +5,7 @@ import java.util.jar.*;
 
 /** BiliFix 回归测试：配置解析 + 参数替换（与 JarToolMixin/BiliFixConfig 相同逻辑，与当前 jar 版本同步） */
 public class Regression {
-    static int passed = 0, failed = 0;
+    static int passed = 0, failed = 0, skipped = 0;
 
     /**
      * 版本号单一来源：从 mods.toml 读取。
@@ -158,7 +158,7 @@ public class Regression {
                 check("jar: 含 neoforge.mods.toml", jf.getJarEntry("META-INF/neoforge.mods.toml") != null);
             }
         } else {
-            System.out.println("  [SKIP] jar: build 产物缺失，跳过 jar 结构检查");
+            skip("jar: build 产物缺失，跳过 jar 结构检查");
         }
 
         // ============ 9.6b. 1.20.1 变体 jar 守卫（v1.4.8）：结构 + JAVA_17 改写无残留 ============
@@ -170,7 +170,7 @@ public class Regression {
                 {"-mc1.20.1-forge.jar",  "MANIFEST MixinConfigs"},
                 {"-mc1.20.1-fabric.jar", "fabric.mod.json entrypoint"}}) {
             Path vjar = pickJar("BiliFix-", variant[0]);
-            if (vjar == null) { System.out.println("  [SKIP] jar: " + variant[0] + " 未构建，跳过"); continue; }
+            if (vjar == null) { skip("jar: BiliFix-" + SOURCE_VERSION + variant[0] + " 未构建，跳过"); continue; }
             try (JarFile jf = new JarFile(vjar.toFile())) {
                 String nm = vjar.getFileName().toString();
                 check("jar: " + nm + " 含 JarToolMixin.class",
@@ -238,7 +238,7 @@ public class Regression {
             check("mods.toml: 依赖 neoforge", toml.contains("modId = \"neoforge\""));
             check("mods.toml: [[mixins]] 存在", toml.contains("[[mixins]]"));
         } else {
-            System.out.println("  [SKIP] mods.toml: 源文件缺失，跳过结构检查");
+            skip("mods.toml: 源文件缺失，跳过结构检查");
         }
 
         // ============ 9.8. 版本一致性：四处描述符必须同版本（v1.4.8 防漏改） ============
@@ -262,7 +262,7 @@ public class Regression {
             check("mixins.json: injectors.defaultRequire=0",
                     mixins.contains("\"defaultRequire\": 0"));
         } else {
-            System.out.println("  [SKIP] bilifix.mixins.json: 源文件缺失，跳过结构检查");
+            skip("bilifix.mixins.json: 源文件缺失，跳过结构检查");
         }
 
         // ============ 10. 端到端：写默认文件→重读→改值→再读 ============
@@ -383,7 +383,7 @@ public class Regression {
                 check("并发: CrashSentinel.record 声明为 synchronized（上限硬保证）",
                         src.matches("(?s).*public\\s+static\\s+synchronized\\s+void\\s+record\\s*\\(.*"));
             } else {
-                System.out.println("  [SKIP] 并发: CrashSentinel.java 缺失，跳过源码断言");
+                skip("并发: CrashSentinel.java 缺失，跳过源码断言");
             }
         }
 
@@ -404,7 +404,7 @@ public class Regression {
                 check("配置: writeDefault 会创建父目录（createDirectories）",
                         src.contains("Files.createDirectories(parent)"));
             } else {
-                System.out.println("  [SKIP] 配置: BiliFixConfig.java 缺失，跳过源码断言");
+                skip("配置: BiliFixConfig.java 缺失，跳过源码断言");
             }
             // (b) 镜像 writeDefault 的目录处理，验证语义：父目录缺失也要写成功
             try {
@@ -448,7 +448,7 @@ public class Regression {
                 check("诊断: waterframes 探测类名正确",
                         src.contains("\"me.srrapero720.waterframes.WaterFrames\""));
             } else {
-                System.out.println("  [SKIP] 诊断: EnvironmentDiagnostics.java 缺失，跳过源码断言");
+                skip("诊断: EnvironmentDiagnostics.java 缺失，跳过源码断言");
             }
             // (b) 行为级证据：Class.forName 在"类文件存在、依赖缺失"时抛的是
             // NoClassDefFoundError（Error）而非 ClassNotFoundException（Exception）——
@@ -479,7 +479,7 @@ public class Regression {
                 check("配置: verbose 声明为 volatile",
                         src.matches("(?s).*public\\s+static\\s+volatile\\s+boolean\\s+verbose\\s*=.*"));
             } else {
-                System.out.println("  [SKIP] 配置: BiliFixConfig.java 缺失，跳过源码断言");
+                skip("配置: BiliFixConfig.java 缺失，跳过源码断言");
             }
         }
 
@@ -548,7 +548,7 @@ public class Regression {
                             s.matches("(?s).*public\\s+static\\s+void\\s+recordHarden\\s*\\(.*?"
                                     + "\\)\\s*\\{\\s*if\\s*\\(\\s*suppressForensics\\s*\\)\\s*return;.*"));
                 } else {
-                    System.out.println("  [SKIP] 取证: CrashSentinel.java 缺失，跳过源码断言");
+                    skip("取证: CrashSentinel.java 缺失，跳过源码断言");
                 }
                 check("取证: 功能自检成对使用抑制开关（进入+finally 复位）",
                         g.matches("(?s).*setForensicsSuppressed\\s*\\(\\s*true\\s*\\).*"));
@@ -565,7 +565,7 @@ public class Regression {
                 check("自检: vout=original（期望 null）不误报",
                         g.contains("expectedVout == null ? actualVout != null"));
             } else {
-                System.out.println("  [SKIP] 守卫: MixinTargetGuard.java 缺失，跳过源码断言");
+                skip("守卫: MixinTargetGuard.java 缺失，跳过源码断言");
             }
             // (i) findValue 的行为级用例表：自检与 mixin 必须用同一套解析规则，
             //     否则自检会给出与真实改写相矛盾的结论。
@@ -574,7 +574,14 @@ public class Regression {
         }
 
         System.out.println();
-        System.out.println("通过 " + passed + " / 失败 " + failed);
+        System.out.println("通过 " + passed + " / 失败 " + failed + " / 跳过 " + skipped);
+        // 跳过项必须显式计数并提示：否则 CI 环境（没有 build/ 产物）只打印
+        // "通过 110 / 失败 0"，看起来像回归套件缩水了 21 条，实际是 jar 结构
+        // 断言合理跳过。这与本项目其它"静默失效"是同一类问题。
+        if (skipped > 0) {
+            System.out.println("注意：有 " + skipped + " 条断言被跳过（通常是缺少 jar 产物；"
+                    + "完整覆盖需先运行 build.ps1 / build-forge.ps1 / build-fabric.ps1）");
+        }
         if (failed > 0) System.exit(1);
     }
 
@@ -1016,5 +1023,17 @@ public class Regression {
     static void check(String name, boolean ok) {
         if (ok) { passed++; System.out.println("  [PASS] " + name); }
         else { failed++; System.out.println("  [FAIL] " + name); }
+    }
+
+    /**
+     * 跳过的断言：单独计数，绝不混入通过数。
+     *
+     * <p>此前跳过项既不计数也不汇总，于是 CI 环境（没有 build/ 产物）只打印
+     * "通过 110 / 失败 0"——看起来像回归套件缩水了 21 条，实际是 jar 结构断言
+     * 合理跳过。这类"信息缺失导致误判"和本项目其它静默失效是同一类问题。</p>
+     */
+    static void skip(String reason) {
+        skipped++;
+        System.out.println("  [SKIP] " + reason);
     }
 }

@@ -58,9 +58,19 @@ if ($manualPending) {
     # 1 jar visible at top level vs 4 actually built -> the Forge/Fabric variants
     # could still never be published, even after the hardcoded-loader fix.
     # Now the whole build tree is scanned recursively.
+    #
+    # v1.4.8 fix #2: recursion also picks up STALE artifacts of older versions
+    # still sitting in build\ (measured: the 10-16 BiliFix-1.4.7-forge jar, built
+    # from v1.4.7 sources, never in-game tested - publishing it would ship a jar
+    # the current source tree can no longer even build). Discovery is now scoped
+    # to the CURRENT source version; older jars are reported but never uploaded.
     $ghTokenFile = Join-Path $env:USERPROFILE '.dsh\gh.token'
     $ghToken = if (Test-Path $ghTokenFile) { (Get-Content $ghTokenFile -Raw).Trim() }
     $ghRels = if ($ghToken) { Invoke-RestMethod -Uri 'https://api.github.com/repos/szkele1145/BiliFix/releases' -Headers @{ Authorization = "Bearer $ghToken"; 'User-Agent' = 'BiliFix' } -Proxy $proxy }
+    # current version - single source of truth, the same file deploy.ps1 reads
+    $toml = Get-Content (Join-Path $root 'src\main\resources\META-INF\neoforge.mods.toml') -Raw -Encoding UTF8
+    if (-not ($toml -match '(?s)\[\[mods\]\].*?version\s*=\s*"([^"]+)"')) { throw "cannot read version from neoforge.mods.toml" }
+    $currentVer = $Matches[1]
     $buildDir = Join-Path $root 'build'
     $pending = Get-ChildItem $buildDir -Filter 'BiliFix-*.jar' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
         if ($_.BaseName -notmatch '^BiliFix-(.+)-mc(\d+\.\d+(?:\.\d+)?)-(neoforge|forge|fabric)$') {
@@ -68,6 +78,10 @@ if ($manualPending) {
             return
         }
         $ver = $Matches[1]; $mcver = $Matches[2]; $loader = $Matches[3]
+        if ($ver -ne $currentVer) {
+            Write-Host "  $($_.Name): not the current source version ($currentVer) - ignoring (stale artifact)" -ForegroundColor DarkGray
+            return
+        }
         $key = "$ver|$loader"
         if ($existingKeys -contains $key) { return }
         $rel = $ghRels | Where-Object { $_.tag_name -eq "v$ver" }

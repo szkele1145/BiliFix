@@ -38,11 +38,12 @@
 - 新增 §9.6b：1.20.1 两变体 jar 结构守卫——in-jar `bilifix.mixins.json` 必须是
   `JAVA_17` 且**无 `JAVA_21` 残留**（防打包暂存改写被 `git checkout` 之类操作
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`，Fabric 断言
-  `fabric.mod.json` entrypoint 与 `BiliFixFabric.class`（89 → 99 项）
+  `fabric.mod.json` entrypoint 与 `BiliFixFabric.class`（89 → 102 项）
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
-  > 19 项，v1.4.8 再加 10 项，故当前源码为 99（`./build.ps1` 实测"通过 99 / 失败 0"）。
+  > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫与 Forge 三处机制差异断言，故当前源码
+  > 为 102（`./build.ps1` 实测"通过 102 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

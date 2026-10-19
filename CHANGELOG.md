@@ -130,6 +130,20 @@
   - 探针实证：抑制态调用 → `mediaTouched=false`；复位后调用 → `mediaTouched=true`
   - 回归 §19：4 条守卫（提供开关 / recordHarden 早退 / 成对使用 / finally 复位）。
     负向测试 ×2：去掉抑制检查 → `[FAIL]`；去掉 finally 复位 → `[FAIL]`，均退出码 1
+- **发布链两处缺陷修复**（`4ec0fc6`，`deploy.ps1`）：
+  1. **资产新鲜度按大小判定不可靠** → 改按 **sha256** 比对。GitHub API 的
+     `asset.digest` 字段语义经实测确认（下载 v1.4.5 资产算 sha256，与 API 字段
+     完全一致）。仓库自身历史就是反例：**v1.4.4 与 v1.4.5 的 jar 同为 20582
+     字节但内容不同**——旧逻辑会把 v1.4.5 判为"已是最新"并跳过上传，线上留下
+     陈旧的 v1.4.4 资产。新逻辑比对 digest，无 digest 字段时回退比大小
+  2. **脚本会自动创建 tag + Release** → 这正是项目发布纪律要守住的关口
+     （`## Unreleased` 只在**双 loader 真机验证通过后**才晋级为 `## <版本>`）。
+     误跑一次就会发布未验证的 v1.4.8。现在脚本在 CHANGELOG 里找不到**已晋级**的
+     `## <版本>` 标题时**拒绝创建 Release**；`-ForceRelease` 可有意越过
+  - 实测：v1.4.8 仍在 Unreleased 时闸门抛出、退出码 1、**无任何远端副作用**；
+    临时晋级后闸门放行（随后还原）
+  - ⚠️ `deploy.ps1` 是 UTF-8 **with BOM**：edit 工具会剥 BOM，改写后必须补回
+    （本次已踩到：剥掉后中文实例名变乱码 → ParserError）
 - 注入点冲突排查（字节级）：bilibili_media 2.3 的两个 mixin
   （`IHateWaterMediaMixin` → `org/watermedia/WaterMedia`、
   `NetworkAPIMixin` → `NetworkAPI`/`ILoader`）均**不碰 `JarTool`**

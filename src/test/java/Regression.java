@@ -195,6 +195,19 @@ public class Regression {
                     var mf = jf.getManifest();
                     check("jar: " + nm + " MANIFEST 含 MixinConfigs",
                             mf != null && mf.getMainAttributes().getValue("MixinConfigs") != null);
+                    // [差异1] Forge 1.20.1 FML 不认 mods.toml 的 [[mixins]] 块（NeoForge 专属），
+                    // mixin 只能靠 MANIFEST 注册 —— 两者机制正好相反，打包时块必须被剥离
+                    var te = jf.getJarEntry("META-INF/mods.toml");
+                    check("jar: " + nm + " 含 META-INF/mods.toml", te != null);
+                    if (te != null) {
+                        String tt = new String(jf.getInputStream(te).readAllBytes(), StandardCharsets.UTF_8);
+                        check("jar: " + nm + " mods.toml 已剥离 [[mixins]] 块（Forge 不认该块）",
+                                !tt.contains("[[mixins]]"));
+                        // [差异2] Forge 用 mandatory=true/false；NeoForge 的 type="required" 语法
+                        // 在 Forge 上是非法字段，打包时必须已转换
+                        check("jar: " + nm + " mods.toml 依赖语法已转为 mandatory=",
+                                tt.contains("mandatory") && !tt.matches("(?s).*type\\s*=\\s*\"[^\"]*\".*"));
+                    }
                 }
             }
         }

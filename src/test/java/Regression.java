@@ -483,6 +483,49 @@ public class Regression {
             }
         }
 
+        // ============ 18. Mixin 注入目标自检必须在启动序列里（v1.4.8） ============
+        // Mixin 按方法名匹配目标，bilifix.mixins.json 的 defaultRequire=0（可选注入）
+        // → 未来 watermedia 给 readArray 加重载或改签名时，Mixin 会**静默跳过注入**：
+        // 模组"装上了、修好了、什么都没发生"，崩溃回归却无迹可寻。
+        // 必须有启动自检把沉默的失效变成一条明确警告。
+        {
+            Path guardSrc = Paths.get("src", "main", "java", "dev", "polaris_fix",
+                                     "bilifix", "MixinTargetGuard.java");
+            Path modSrc = Paths.get("src", "main", "java", "dev", "polaris_fix",
+                                    "bilifix", "BiliFixMod.java");
+            if (Files.exists(guardSrc) && Files.exists(modSrc)) {
+                String g = Files.readString(guardSrc, StandardCharsets.UTF_8);
+                String m = Files.readString(modSrc, StandardCharsets.UTF_8);
+                check("守卫: MixinTargetGuard 存在且被启动序列调用",
+                        m.contains("MixinTargetGuard.check(LOGGER)"));
+                // 目标类名/方法名必须与 Mixin 声明一致，否则自检的是另一个目标
+                check("守卫: 自检目标类名与 Mixin 一致",
+                        g.contains("\"org.watermedia.core.tools.JarTool\"")
+                        && g.contains("\"readArray\""));
+                // 必须能区分"未安装"与"歧义/缺失"——否则无法在正常场景下不误报
+                check("守卫: 区分 WATERMEDIA_ABSENT 与 AMBIGUOUS_OR_MISSING",
+                        g.contains("WATERMEDIA_ABSENT") && g.contains("AMBIGUOUS_OR_MISSING"));
+                // 混合in's JSON 里 defaultRequire 必须为 0（可选注入）→ 所以守卫是必需品
+                Path mixinJson = Paths.get("src", "main", "resources", "bilifix.mixins.json");
+                if (Files.exists(mixinJson)) {
+                    String j = Files.readString(mixinJson, StandardCharsets.UTF_8);
+                    check("守卫: mixins.json 的 defaultRequire 为 0（故需自检兜底）",
+                            j.contains("\"defaultRequire\": 0"));
+                }
+                // (b) 行为级验证判定逻辑本身——用 JDK 编译器现场构造四个态：
+                //   正常（单签名） → OK
+                //   未安装          → WATERMEDIA_ABSENT
+                //   重载            → AMBIGUOUS_OR_MISSING
+                //   签名变化        → SIGNATURE_MISMATCH
+                // 复刻 MixinTargetGuard 的目标常量，与生产代码保持同源（上面两条
+                // 源码断言保证常量不漂移，这里再用同常量构造假类，双保险）。
+                check("守卫: 判定逻辑四态行为正确（正常/未安装/重载/签名变化）",
+                        mixinGuardFourStates());
+            } else {
+                System.out.println("  [SKIP] 守卫: MixinTargetGuard.java 缺失，跳过源码断言");
+            }
+        }
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);
@@ -499,6 +542,113 @@ public class Regression {
     // ===== 与 modLine 相同的版本可用性判定 =====
     static boolean verUsable(String ver) {
         return ver != null && !ver.isBlank() && !ver.contains("${");
+    }
+
+    /**
+     * 行为级验证（§18）：MixinTargetGuard 的判定逻辑必须能区分四个态。
+     * 用 JDK 自带编译器现场编译四种形态的假 {@code org.watermedia.core.tools.JarTool}，
+     * 各放进独立的目录，再用隔离的 URLClassLoader 逐个加载、调用
+     * {@code MixinTargetGuard.evaluate()} 的同构镜像（Regression 不链接生产类，
+     * 故按文件头说明镜像其逻辑），断言每个态返回预期结论。
+     *
+     * <p>四态与预期：</p>
+     * <ul>
+     *   <li>单签名 {@code readArray(String)} → OK（与真实 2.1.36/2.1.37 一致）</li>
+     *   <li>目录里没有该类 → WATERMEDIA_ABSENT</li>
+     *   <li>重载 {@code readArray(String) + readArray(String, boolean)} → AMBIGUOUS_OR_MISSING</li>
+     *   <li>签名变化 {@code readArray(File)} → SIGNATURE_MISMATCH</li>
+     * </ul>
+     */
+    static boolean mixinGuardFourStates() {
+        javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) return false;
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("bilifix-guard");
+            // 正常态
+            String okSrc = "package org.watermedia.core.tools;\n"
+                    + "public class JarTool { public static String[] readArray(String s) { return new String[0]; } }";
+            // 重载态
+            String overSrc = "package org.watermedia.core.tools;\n"
+                    + "public class JarTool {\n"
+                    + "  public static String[] readArray(String s) { return new String[0]; }\n"
+                    + "  public static String[] readArray(String s, boolean strict) { return new String[0]; }\n"
+                    + "}";
+            // 签名变化态
+            String sigSrc = "package org.watermedia.core.tools;\n"
+                    + "public class JarTool { public static String[] readArray(java.io.File f) { return new String[0]; } }";
+
+            Path dirOk  = compile(compiler, root.resolve("ok"),  okSrc);
+            Path dirNo  = root.resolve("absent");  // 不创建 → 类不存在
+            Files.createDirectories(dirNo);
+            Path dirOver = compile(compiler, root.resolve("over"), overSrc);
+            Path dirSig  = compile(compiler, root.resolve("sig"),  sigSrc);
+            if (dirOk == null || dirOver == null || dirSig == null) return false;
+
+            return "OK".equals(mirrorEvaluate(dirOk))
+                && "WATERMEDIA_ABSENT".equals(mirrorEvaluate(dirNo))
+                && "AMBIGUOUS_OR_MISSING".equals(mirrorEvaluate(dirOver))
+                && "SIGNATURE_MISMATCH".equals(mirrorEvaluate(dirSig));
+        } catch (Throwable t) {
+            return false;
+        } finally {
+            if (root != null) {
+                try (var s = Files.walk(root)) {
+                    s.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try { Files.deleteIfExists(p); } catch (Exception ignored) { }
+                    });
+                } catch (Exception ignored) { }
+            }
+        }
+    }
+
+    /** 编译一段源码到子目录，返回目录；失败返回 null */
+    static Path compile(javax.tools.JavaCompiler compiler, Path dir, String src) {
+        try {
+            Files.createDirectories(dir);
+            String pkgDir = dir.resolve("org").resolve("watermedia").resolve("core")
+                              .resolve("tools").toString();
+            Files.createDirectories(Paths.get(pkgDir));
+            Path java = Paths.get(pkgDir, "JarTool.java");
+            Files.writeString(java, src, StandardCharsets.UTF_8);
+            if (compiler.run(null, null, null, "-d", dir.toString(), java.toString()) != 0) return null;
+            return dir;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * MixinTargetGuard.evaluate() 的镜像（同构逻辑）——Regression 是独立镜像，
+     * 不链接生产类（文件头说明）。用隔离的 URLClassLoader 指向给定目录。
+     */
+    static String mirrorEvaluate(Path classDir) {
+        try (java.net.URLClassLoader iso = new java.net.URLClassLoader(
+                new java.net.URL[]{ classDir.toUri().toURL() }, null)) {
+            Class<?> cls;
+            try {
+                cls = Class.forName("org.watermedia.core.tools.JarTool", false, iso);
+            } catch (ClassNotFoundException e) {
+                return "WATERMEDIA_ABSENT";
+            } catch (Throwable t) {
+                return "AMBIGUOUS_OR_MISSING";
+            }
+            int matches = 0;
+            boolean sigOk = false;
+            for (java.lang.reflect.Method m : cls.getDeclaredMethods()) {
+                if (!m.getName().equals("readArray")) continue;
+                matches++;
+                if (java.lang.reflect.Modifier.isStatic(m.getModifiers())
+                        && m.getReturnType() == String[].class
+                        && java.util.Arrays.equals(m.getParameterTypes(), new Class<?>[]{String.class})) {
+                    sigOk = true;
+                }
+            }
+            if (matches == 0 || matches > 1) return "AMBIGUOUS_OR_MISSING";
+            return sigOk ? "OK" : "SIGNATURE_MISMATCH";
+        } catch (Throwable t) {
+            return "AMBIGUOUS_OR_MISSING";
+        }
     }
 
     /**

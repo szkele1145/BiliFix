@@ -61,6 +61,9 @@ public class BiliFixMod {
         LOGGER.info("[BiliFix] v{} 已加载：watermedia VLC 硬解崩溃修复（策略: hw={}, vout={}）",
                 VERSION, BiliFixConfig.hwDecoder, BiliFixConfig.vout);
         EnvironmentDiagnostics.run(LOGGER);
+        // Mixin 注入目标自检：未来 watermedia 改签名/加重载时，Mixin 会静默跳过注入，
+        // 修复无声失效、崩溃回归却无迹可寻。这里把它变成启动时的一条明确警告。
+        MixinTargetGuard.check(LOGGER);
         // 顺序关键：先检测上次是否异常终止（残留 lock），再注册本次的守护
         if (gameDir != null) {
             String crash = CrashSentinel.detectUncleanShutdown(gameDir);

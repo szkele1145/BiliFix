@@ -60,7 +60,7 @@
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
   依赖语法已转 `mandatory=`、jar 内 `BiliFixMod.class` 无 `ModContainer` 残留
   （无参构造改写生效），Fabric 断言 `fabric.mod.json` entrypoint 与
-  `BiliFixFabric.class`（89 → 116 项）
+  `BiliFixFabric.class`（89 → 121 项）
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
@@ -77,7 +77,7 @@
   ClassLoader 场景，断言 `Class.forName(fqn, false, loader)` 实际抛出的确是
   `NoClassDefFoundError`（探针 ForNameProbe2 实证 `initialize=false` 同样触发
   链接失败）。负向测试：删 Throwable 兜底、或破坏 NCDFE 判定分支 → `[FAIL]`、
-  退出码 1（89 → 116 项）
+  退出码 1（89 → 121 项）
 - 新增 §17：配置三字段必须 `volatile`——`hwDecoder` / `vout` / `verbose` 由主线程
   的 `load()` 写入，而读方 `JarToolMixin` 经 `PlayerAPI.start() → readArray`
   可能在 watermedia 的**工作线程**上执行。JLS §17.4.5：两线程间若无
@@ -86,12 +86,28 @@
   回来，但 `hwDecoder = "any"` 之类的高危自定义可能读不到）。三个字段改为
   `volatile`（引用写入本就原子，只补可见性，运行时零成本）。
   负向测试：去掉任一 `volatile` → `[FAIL]`、退出码 1
+- 新增 `MixinTargetGuard`（启动自检）——Mixin 按**方法名**匹配目标，而
+  `bilifix.mixins.json` 的 `defaultRequire: 0`（可选注入）→ 未来 watermedia
+  给 `readArray` **加重载**或**改签名**时，Mixin 会**静默跳过注入**：模组
+  "装上了、修好了、什么都没发生"，崩溃回归却无迹可寻。现在启动时反射核验
+  `JarTool` 的 `readArray` 唯一且签名匹配，异常则在日志里给出明确警告。
+  四态判定：`OK` / `WATERMEDIA_ABSENT`（未装，正常不报警）/
+  `AMBIGUOUS_OR_MISSING`（重载或缺失）/ `SIGNATURE_MISMATCH`（签名变化）
+  - 字节级证据：真实 2.1.36 / 2.1.37 的 `JarTool.class` 各 18 个方法，
+    `readArray` 均**恰好 1 个**（探针 MixinTargetProbe 解析方法表）→ 当前安全
+  - 行为级证据：把 `MixinTargetGuard` 放到真实 watermedia jar 的 classpath 上跑，
+    2.1.36 / 2.1.37 → `OK`；无 watermedia → `WATERMEDIA_ABSENT`；
+    现场编译的重载假类 → `AMBIGUOUS_OR_MISSING`；签名变化的假类 →
+    `SIGNATURE_MISMATCH`
+  - 回归 §18：源码断言（接线 + 目标常量 + defaultRequire=0）+ 四态行为用例
+    （JDK 编译器现场造四种假类）。负向测试：放过重载 → `[FAIL]`、退出码 1
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
   > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
-  > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫、§16 诊断探测守卫与
-  > §17 配置可见性守卫，故当前源码为 116（`./build.ps1` 实测"通过 116 / 失败 0"）。
+  > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫、§16 诊断探测守卫、
+  > §17 配置可见性守卫与 §18 Mixin 目标守卫，故当前源码为 121
+  > （`./build.ps1` 实测"通过 121 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

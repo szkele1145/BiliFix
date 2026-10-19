@@ -129,7 +129,7 @@ Then play the video that previously crashed the game — it should no longer exi
 ## Building From Source
 
 ```powershell
-./build.ps1           # compile + run 116 regression tests + package (NeoForge 1.21.1)
+./build.ps1           # compile + run 121 regression tests + package (NeoForge 1.21.1)
 ./build-forge.ps1     # Forge 1.20.1 variant
 ./build-fabric.ps1    # Fabric 1.20.1 variant
 ```

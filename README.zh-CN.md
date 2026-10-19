@@ -92,7 +92,7 @@ verbose = false
 |---|---|
 | Minecraft | 1.21.1（NeoForge）/ 1.20.1（Forge、Fabric） |
 | 加载器 | NeoForge 21.1.x / Forge 47.x / Fabric Loader 0.14.21+ |
-| watermedia | **2.1.x**（实测 2.1.37） |
+| watermedia | **2.1.x**（真机验证：2.1.36 · 签名探针验证：2.1.37） |
 | bilibili_media | 2.3 |
 
 理论上同样适用于所有用 watermedia 2.1 播放视频的场景（netmusic、waterframes 等），不限 B 站。

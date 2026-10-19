@@ -95,7 +95,7 @@ The startup diagnostics also report the exact companion-chain versions
 |---|---|
 | Minecraft | 1.21.1 (NeoForge) / 1.20.1 (Forge, Fabric) |
 | Loaders | NeoForge 21.1.x / Forge 47.x / Fabric Loader 0.14.21+ |
-| watermedia | **2.1.x** (tested 2.1.37) |
+| watermedia | **2.1.x** (in-game verified: 2.1.36 · signature-probe verified: 2.1.37) |
 | bilibili_media | 2.3 |
 
 Also applies to any mod playing videos through watermedia 2.1 (netmusic, waterframes, etc.), not just Bilibili.

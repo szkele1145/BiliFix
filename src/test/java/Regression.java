@@ -521,6 +521,18 @@ public class Regression {
                 // 源码断言保证常量不漂移，这里再用同常量构造假类，双保险）。
                 check("守卫: 判定逻辑四态行为正确（正常/未安装/重载/签名变化）",
                         mixinGuardFourStates());
+                // (c) 功能级自检必须被启动序列调用——"目标完好 + 签名匹配"仍不等于
+                //     "注入已应用"（mixin 框架对 required:false 会把注入失败降级为
+                //     debug 日志）。功能自检是唯一能端到端证明注入生效的手段。
+                check("守卫: 功能自检 functionalProbe 被启动序列调用",
+                        m.contains("MixinTargetGuard.functionalProbe(LOGGER)"));
+                // (d) 功能自检必须比对"配置期望值"而非硬编码 none——
+                //     否则用户把 hwDecoder 改成 any 时自检会误报失败。
+                check("守卫: 功能自检比对配置期望值",
+                        g.contains("BiliFixConfig.hwDecoderValue()"));
+                // (e) 探测用的资源名必须与 PlayerAPI 实际读取的一致
+                check("守卫: 功能自检资源名与 PlayerAPI 一致",
+                        g.contains("\"videolan/arguments.json\""));
             } else {
                 System.out.println("  [SKIP] 守卫: MixinTargetGuard.java 缺失，跳过源码断言");
             }

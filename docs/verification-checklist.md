@@ -35,6 +35,27 @@
 
    **若"环境诊断"里 GPU 行显示你的真实显卡型号（如 NVIDIA/AMD/Intel）→ GPU 检测工作正常**
 
+   ### v1.4.8 新增：两条自检日志（必须出现）
+
+   ```
+   [BiliFix] Mixin 注入目标自检通过: org.watermedia.core.tools.JarTool.readArray(String) 唯一匹配
+   [BiliFix] 功能自检通过: --avcodec-hw=none —— 注入已生效（端到端验证）
+   ```
+
+   - [ ] 出现「Mixin 注入目标自检通过」行
+   - [ ] 出现「**功能自检通过**」行 —— 这行是**端到端**证据：它真的调用了一次
+     `JarTool.readArray`，并确认返回的 `--avcodec-hw` 已是安全值
+   - [ ] 若出现任何 `⚠` 开头的 BiliFix 警告行 → **判定不通过**（说明注入未生效，
+     崩溃会回来）
+
+   > 功能自检为何是决定性的：`bilifix.mixins.json` 是 `required:false`，
+   > mixin 框架会把注入失败降级为 debug 日志（正常日志级别看不见）→
+   > "模组装着、修复没生效"这种最难察觉的失效，过去没有任何提示。
+   > 功能自检是唯一能证明注入真的生效的手段。
+   > 参考基线（`out/mixin-e2e/probe-mixin-e2e.ps1` A 线实证）：裸 JVM 无 mixin
+   > 时真实 2.1.36 的参数表是 `--avcodec-hw d3d11va,dxva2,any` +
+   > `--vout direct3d11,glwin32,gl,any`（18 项）——游戏内应看不到这组值。
+
 ## 二、核心验证（播放之前必崩的视频）
 
 3. 进入之前崩过的服务器/存档

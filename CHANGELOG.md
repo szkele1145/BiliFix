@@ -60,7 +60,7 @@
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
   依赖语法已转 `mandatory=`、jar 内 `BiliFixMod.class` 无 `ModContainer` 残留
   （无参构造改写生效），Fabric 断言 `fabric.mod.json` entrypoint 与
-  `BiliFixFabric.class`（89 → 121 项）
+  `BiliFixFabric.class`（89 → 124 项）
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
@@ -77,7 +77,7 @@
   ClassLoader 场景，断言 `Class.forName(fqn, false, loader)` 实际抛出的确是
   `NoClassDefFoundError`（探针 ForNameProbe2 实证 `initialize=false` 同样触发
   链接失败）。负向测试：删 Throwable 兜底、或破坏 NCDFE 判定分支 → `[FAIL]`、
-  退出码 1（89 → 121 项）
+  退出码 1（89 → 124 项）
 - 新增 §17：配置三字段必须 `volatile`——`hwDecoder` / `vout` / `verbose` 由主线程
   的 `load()` 写入，而读方 `JarToolMixin` 经 `PlayerAPI.start() → readArray`
   可能在 watermedia 的**工作线程**上执行。JLS §17.4.5：两线程间若无
@@ -101,13 +101,34 @@
     `SIGNATURE_MISMATCH`
   - 回归 §18：源码断言（接线 + 目标常量 + defaultRequire=0）+ 四态行为用例
     （JDK 编译器现场造四种假类）。负向测试：放过重载 → `[FAIL]`、退出码 1
+- **功能级自检 `MixinTargetGuard.functionalProbe`**——"目标完好 + 签名匹配"
+  仍不等于"注入已应用"：mixin 框架对 `required:false` 配置把注入失败降级为
+  debug 日志，正常日志级别下不可见，这是最后一条静默失效路径。功能自检在
+  mod 构造时**真正调用一次** `JarTool.readArray("videolan/arguments.json")`
+  （此时 JarTool 首次被加载、mixin 转换已在链上，看到的就是注入后的方法），
+  比对 `--avcodec-hw` 的值是否等于**配置期望值**（非硬编码 none，用户改
+  `hwDecoder = "any"` 不误报）：
+  - 安全性（javap 字节码实证）：`JarTool.<clinit>` 只建 log4j Marker + Gson；
+    `readArray` 只读 jar 内资源 + Gson 解析，无网络/原生库/文件写入
+  - 基线实证（`out/mixin-e2e/probe-mixin-e2e.ps1`，A 线）：裸 JVM 无 mixin 时
+    调用真实 2.1.36 的 `readArray` 返回**原始危险值**
+    `--avcodec-hw d3d11va,dxva2,any` + `--vout direct3d11,glwin32,gl,any`
+    （18 项）——功能自检的对比组成立，"修了"与"没修"可分辨
+  - 裸 JVM 负向行为已验证：无 mixin 环境下功能自检正确报告"未加固"
+    （NOT-HARDENED），不误报
+  - 回归 §18 扩展：功能自检接线 + 比对配置期望值 + 资源名与 PlayerAPI 一致
+    （javap 实证）。负向测试：删掉 functionalProbe 调用 → `[FAIL]`、退出码 1
+- 注入点冲突排查（字节级）：bilibili_media 2.3 的两个 mixin
+  （`IHateWaterMediaMixin` → `org/watermedia/WaterMedia`、
+  `NetworkAPIMixin` → `NetworkAPI`/`ILoader`）均**不碰 `JarTool`**
+  → 与本模组注入点无冲突
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
   > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
   > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫、§16 诊断探测守卫、
-  > §17 配置可见性守卫与 §18 Mixin 目标守卫，故当前源码为 121
-  > （`./build.ps1` 实测"通过 121 / 失败 0"）。
+  > §17 配置可见性守卫与 §18 Mixin 目标守卫，故当前源码为 124
+  > （`./build.ps1` 实测"通过 124 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

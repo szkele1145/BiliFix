@@ -45,7 +45,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 
 ## Infrastructure
 
-- ✅ One-command build (121 tests + jar integrity gate)
+- ✅ One-command build (124 tests + jar integrity gate)
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)

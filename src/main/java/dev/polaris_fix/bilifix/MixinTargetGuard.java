@@ -115,4 +115,79 @@ public final class MixinTargetGuard {
         if (matches > 1) return Status.AMBIGUOUS_OR_MISSING;    // 重载 → 歧义
         return signatureOk ? Status.OK : Status.SIGNATURE_MISMATCH;
     }
+
+    /**
+     * 功能级自检：真正调用一次 {@code readArray("videolan/arguments.json")}，
+     * 检查返回的参数是否已被本模组加固。
+     *
+     * <p><b>为什么要功能级</b>：{@link #evaluate()} 只证明"目标类存在且签名唯一"，
+     * 证明不了"Mixin 注入真的应用了"。mixin 框架对 {@code required:false} 的
+     * 配置会把注入失败降级为 debug 日志（正常日志级别下不可见）——于是还剩
+     * 最后一条静默失效路径：<b>目标完好、签名匹配、但注入没打上</b>。
+     * 唯一可靠的判据是端到端的：调用一次，看返回值。</p>
+     *
+     * <p><b>时序依据</b>：本方法在 mod 构造时调用。mixin 转换发生在<b>类加载</b>
+     * 时——JarTool 此前从未被加载（无人触碰），本方法第一次触发其加载，
+     * MixinTransformer 已在链上（mod 构造前 mixin 系统已激活），
+     * 所以此刻看到的就是被注入后的方法。</p>
+     *
+     * <p><b>安全性</b>（javap 字节码实证）：JarTool 的 {@code <clinit>} 只建
+     * log4j Marker 与 Gson 实例；readArray 只读 jar 内资源 + Gson 解析，
+     * 无网络、无原生库、无文件写入——可安全调用。</p>
+     *
+     * <p>裸 JVM 探针（无 mixin 环境）验证过：该探测在"没有 mixin"时正确报告
+     * 参数未被加固（能分辨"修了"与"没修"）。</p>
+     *
+     * @param logger 日志器
+     * @return true = 参数已被加固（修复链路端到端生效）；
+     *         false = 参数仍是原始危险值（注入未生效）或无法判定
+     */
+    public static boolean functionalProbe(Logger logger) {
+        try {
+            Class<?> cls = Class.forName(TARGET_CLASS, true, MixinTargetGuard.class.getClassLoader());
+            Method readArray = cls.getDeclaredMethod(TARGET_METHOD, String.class);
+            String[] args = (String[]) readArray.invoke(null, PROBE_RESOURCE);
+            if (args == null) {
+                logger.warn("[BiliFix] ⚠ 功能自检无法判定：readArray({}) 返回 null", PROBE_RESOURCE);
+                return false;
+            }
+            String expected = dev.polaris_fix.bilifix.config.BiliFixConfig.hwDecoderValue();
+            for (int i = 0; i < args.length; i++) {
+                if ("--avcodec-hw".equals(args[i])) {
+                    boolean hardened = i + 1 < args.length && expected.equals(args[i + 1]);
+                    if (hardened) {
+                        logger.info("[BiliFix] 功能自检通过: --avcodec-hw={} —— 注入已生效（端到端验证）", expected);
+                    } else {
+                        logger.warn("[BiliFix] ⚠ 功能自检失败：参数仍为原始值 '--avcodec-hw {}'（期望 {}）。"
+                                + "Mixin 注入未生效，本版本修复可能不工作！请向 BiliFix 反馈。",
+                                i + 1 < args.length ? args[i + 1] : "(无值)", expected);
+                    }
+                    return hardened;
+                }
+                if (args[i].startsWith("--avcodec-hw=")) {
+                    boolean hardened = args[i].equals("--avcodec-hw=" + expected);
+                    if (hardened) {
+                        logger.info("[BiliFix] 功能自检通过: {} —— 注入已生效（端到端验证）", args[i]);
+                    } else {
+                        logger.warn("[BiliFix] ⚠ 功能自检失败：参数仍为原始值 '{}'（期望 --avcodec-hw={}）。"
+                                + "Mixin 注入未生效，本版本修复可能不工作！请向 BiliFix 反馈。",
+                                args[i], expected);
+                    }
+                    return hardened;
+                }
+            }
+            logger.warn("[BiliFix] ⚠ 功能自检无法判定：参数表中未找到 --avcodec-hw（{} 项）", args.length);
+            return false;
+        } catch (ClassNotFoundException e) {
+            // watermedia 未安装：与 evaluate() 同一判定，正常情况，静默
+            return false;
+        } catch (Throwable t) {
+            // 探测本身失败（资源缺、链接错…）：不干扰游戏，只在 debug 级留痕
+            logger.debug("[BiliFix] 功能自检异常（忽略）: {}", t.toString());
+            return false;
+        }
+    }
+
+    /** 功能探测用的资源名：与 PlayerAPI 实际读取的完全一致（javap 实证） */
+    private static final String PROBE_RESOURCE = "videolan/arguments.json";
 }

@@ -64,6 +64,9 @@ public class BiliFixMod {
         // Mixin 注入目标自检：未来 watermedia 改签名/加重载时，Mixin 会静默跳过注入，
         // 修复无声失效、崩溃回归却无迹可寻。这里把它变成启动时的一条明确警告。
         MixinTargetGuard.check(LOGGER);
+        // 功能级自检：真正调用一次 readArray，验证注入端到端生效
+        // （目标存在 + 签名匹配 ≠ 注入已应用；required:false 会把注入失败降级为 debug 日志）
+        MixinTargetGuard.functionalProbe(LOGGER);
         // 顺序关键：先检测上次是否异常终止（残留 lock），再注册本次的守护
         if (gameDir != null) {
             String crash = CrashSentinel.detectUncleanShutdown(gameDir);

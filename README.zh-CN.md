@@ -121,7 +121,7 @@ verbose = false
 ## 从源码构建
 
 ```powershell
-./build.ps1            # 编译 + 121 项回归测试 + 打包（NeoForge 1.21.1）
+./build.ps1            # 编译 + 124 项回归测试 + 打包（NeoForge 1.21.1）
 ./build-forge.ps1      # Forge 1.20.1 变体
 ./build-fabric.ps1     # Fabric 1.20.1 变体
 ```

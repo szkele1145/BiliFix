@@ -147,6 +147,13 @@ public final class BiliFixConfig {
     }
 
     static void writeDefault(Path path) throws IOException {
+        // 父目录可能尚不存在：全新实例，或 Fabric 侧由 entrypoint 注入的
+        // FabricLoader.getConfigDir()。缺目录时 Files.write 抛 NoSuchFileException，
+        // 该异常会被 load() 的 catch 吞成一条 warning —— 修复行为本身仍正确（字段
+        // 已重置为安全默认），但默认配置文件永远不会落盘，用户也就无从调整。
+        // 探针实证：目录缺失时配置创建失败，目录存在时成功（ConfigDirProbe）。
+        Path parent = path.getParent();
+        if (parent != null) Files.createDirectories(parent);
         List<String> lines = new ArrayList<>();
         lines.add("# BiliFix 配置 —— watermedia/libVLC 崩溃修复");
         lines.add("# 修改后需重启游戏生效。");

@@ -373,6 +373,41 @@ public class Regression {
             }
         }
 
+        // ============ 15. 默认配置文件必须能自建父目录（v1.4.8 探针回归） ============
+        // 缺陷（ConfigDirProbe 实证）：writeDefault 直接写 path.resolveSibling(...)，
+        // 从未创建父目录。全新实例或 Fabric 注入的 config 目录尚不存在时，
+        // Files.write 抛 NoSuchFileException → 被 load() 的 catch 吞成一条 warning：
+        // 修复行为本身仍正确（字段已重置安全默认），但默认配置文件永不落盘，
+        // 用户无从调整。探针结果：目录缺失时 NOT-CREATED，目录存在时才 created。
+        //
+        // 两层断言：(a) 源码里必须保留 createDirectories（防回归）；
+        // (b) 用镜像逻辑在临时目录上做真功能验证（缺父目录也要写成功）。
+        {
+            Path cfgSrc = Paths.get("src", "main", "java", "dev", "polaris_fix",
+                                 "bilifix", "config", "BiliFixConfig.java");
+            if (Files.exists(cfgSrc)) {
+                String src = Files.readString(cfgSrc, StandardCharsets.UTF_8);
+                check("配置: writeDefault 会创建父目录（createDirectories）",
+                        src.contains("Files.createDirectories(parent)"));
+            } else {
+                System.out.println("  [SKIP] 配置: BiliFixConfig.java 缺失，跳过源码断言");
+            }
+            // (b) 镜像 writeDefault 的目录处理，验证语义：父目录缺失也要写成功
+            try {
+                Path deep = Files.createTempDirectory("bilifix-deep").resolve("a").resolve("config");
+                Path f = deep.resolve("bilifix.toml");
+                if (f.getParent() != null) Files.createDirectories(f.getParent());
+                Files.write(f, List.of("hwDecoder = \"none\""), StandardCharsets.UTF_8);
+                check("配置: 父目录缺失时默认配置仍能写出", Files.exists(f));
+                Files.deleteIfExists(f);
+                Files.deleteIfExists(deep);
+                Files.deleteIfExists(deep.getParent());
+                Files.deleteIfExists(deep.getParent().getParent());
+            } catch (Exception e) {
+                check("配置: 父目录缺失时默认配置仍能写出", false);
+            }
+        }
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);

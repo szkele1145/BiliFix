@@ -14,12 +14,19 @@
 #   ./deploy.ps1 -Variant fabric               # fabric 1.20.1 to local mods
 #   ./deploy.ps1 -SkipRemote                    # local only, no GitHub calls
 #   ./deploy.ps1 -DryRun                        # show what would happen, change nothing
+#   ./deploy.ps1 -ForceRelease                  # publish even if CHANGELOG is not promoted
+#
+# Release gate: creating a Release = publishing. The script refuses to create a
+# Release for a version whose CHANGELOG section has not been promoted from
+# "## Unreleased" to "## <version>" (the in-game validation must have passed first).
 
 param(
     [ValidateSet('neoforge', 'forge', 'fabric')]
     [string]$Variant = 'neoforge',
     [switch]$SkipRemote,
-    [switch]$DryRun
+    [switch]$DryRun,
+    # Bypass the release gate (CHANGELOG promotion). Only for deliberate overrides.
+    [switch]$ForceRelease
 )
 
 $ErrorActionPreference = 'Stop'
@@ -96,6 +103,31 @@ if (Test-Path $ghTokenFile) {
     if (-not $rel) {
         # A tag/Release is NOT created by git push - it has to be made explicitly.
         # Missing this step is what silently stalled the v1.4.7 publish, so create it here.
+        #
+        # Release discipline gate (v1.4.8): creating a Release means PUBLISHING.
+        # The project rule is "promote CHANGELOG ## Unreleased -> ## <version> only
+        # after the in-game launch validation passed (Forge AND Fabric)". If the
+        # CHANGELOG still has the version under "## Unreleased", the release was
+        # NOT promoted yet -> publishing now would ship an unvalidated build.
+        # Use -ForceRelease to override deliberately.
+        $promoted = $false
+        try {
+            $clPath = Join-Path $root 'CHANGELOG.md'
+            $cl = [System.IO.File]::ReadAllText($clPath, [System.Text.Encoding]::UTF8)
+            $esc = [regex]::Escape($version)
+            # promoted <=> a "## <version>" heading exists AND is not inside Unreleased
+            $promoted = [regex]::IsMatch($cl, "(?m)^##\s+$esc\b")
+        } catch { $promoted = $false }
+        if (-not $promoted -and -not $ForceRelease) {
+            throw ("CHANGELOG has no promoted '## $version' section - the release gate is closed." +
+                   "`n  Publishing means shipping; v$version may only be released after the" +
+                   "`n  in-game launch validation passed (see docs/verification-checklist.md)." +
+                   "`n  Promote CHANGELOG '## Unreleased' -> '## $version' first," +
+                   "`n  or pass -ForceRelease if you really mean to publish now.")
+        }
+        if (-not $promoted) {
+            Write-Host "  WARNING: publishing v$version with -ForceRelease despite an unpromoted CHANGELOG" -ForegroundColor Red
+        }
         Write-Host "  no Release for v$version - creating tag + release..." -ForegroundColor Yellow
         $notes = "BiliFix $version"
         try {
@@ -144,15 +176,28 @@ if (Test-Path $ghTokenFile) {
 
     foreach ($d in $desired) {
         $existing = $rel.assets | Where-Object { $_.name -eq $d.name }
-        $localSize = (Get-Item $d.path).Length
-        if ($existing -and $existing.size -eq $localSize) {
-            Write-Host "  asset $($d.name) already current ($localSize bytes)" -ForegroundColor Green
+        # Content check by SHA-256 (v1.4.8): size alone is NOT sufficient - the very
+        # history of this repo proves it: v1.4.4 and v1.4.5 jars are BOTH 20582 bytes
+        # with completely different content. GitHub exposes asset.digest
+        # ("sha256:...", verified by download+hash against the API field).
+        # If digest is ever unavailable (older GitHub Enterprise), fall back to size.
+        $localHash = 'sha256:' + (Get-FileHash $d.path -Algorithm SHA256).Hash.ToLower()
+        $isCurrent = $false
+        if ($existing) {
+            if ($existing.PSObject.Properties.Name -contains 'digest' -and $existing.digest) {
+                $isCurrent = ($existing.digest -eq $localHash)
+            } else {
+                $isCurrent = ($existing.size -eq (Get-Item $d.path).Length)
+            }
+        }
+        if ($existing -and $isCurrent) {
+            Write-Host "  asset $($d.name) already current (sha256 verified)" -ForegroundColor Green
             continue
         }
         if ($existing) {
             # same name but different content: delete the stale asset, then re-upload
             Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/szkele1145/BiliFix/releases/assets/$($existing.id)" -Headers $h -Proxy $proxy | Out-Null
-            Write-Host "  removed stale asset $($d.name)" -ForegroundColor Yellow
+            Write-Host "  removed stale asset $($d.name) (digest changed)" -ForegroundColor Yellow
         }
         $url = Upload-Asset $rel.id $d.name $d.path
         Write-Host "  asset uploaded: $url" -ForegroundColor Green

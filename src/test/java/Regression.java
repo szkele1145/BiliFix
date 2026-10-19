@@ -208,6 +208,20 @@ public class Regression {
                         check("jar: " + nm + " mods.toml 依赖语法已转为 mandatory=",
                                 tt.contains("mandatory") && !tt.matches("(?s).*type\\s*=\\s*\"[^\"]*\".*"));
                     }
+                    // [差异3] Forge 1.20.1 javafml 反射调用 getDeclaredConstructor()（空 Class
+                    // 数组）——类里必须只有无参构造。若打包的构造器改写正则失配而静默不改，
+                    // (ModContainer) 构造会留进 class，游戏加载时 NoSuchMethodException。
+                    // 字节级断言：class 全字节里不得出现 ModContainer 符号（slash 形式内部名
+                    // net/minecraftforge/fml/ModContainer 也不得有）。
+                    var be = jf.getJarEntry("dev/polaris_fix/bilifix/BiliFixMod.class");
+                    check("jar: " + nm + " 含 BiliFixMod.class", be != null);
+                    if (be != null) {
+                        byte[] bc = jf.getInputStream(be).readAllBytes();
+                        String bs = new String(bc, StandardCharsets.ISO_8859_1);
+                        check("jar: " + nm + " BiliFixMod 无 ModContainer 残留（无参构造改写生效）",
+                                !bs.contains("ModContainer")
+                                        && !bs.contains("net/minecraftforge/fml/ModContainer"));
+                    }
                 }
             }
         }

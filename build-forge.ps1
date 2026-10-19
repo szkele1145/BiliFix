@@ -1,4 +1,4 @@
-# Forge 1.20.1 variant builder.
+﻿# Forge 1.20.1 variant builder.
 # Produces BiliFix-<version>-mc1.20.1-forge.jar from the SAME sources with 3 import
 # substitutions (net.neoforged.* -> net.minecraftforge.*) + Forge-flavored mods.toml.
 # Layout: src/main/java is shared; this script stages patched copies into build/forge.
@@ -68,6 +68,11 @@ Get-ChildItem $srcDir -Recurse -Filter '*.java' | ForEach-Object {
         $c = $c -replace 'public BiliFixMod\(ModContainer container\)', 'public BiliFixMod()'
         # drop the now-unused ModContainer import on the Forge side
         $c = $c -replace '(?m)^import net\.minecraftforge\.fml\.ModContainer;\s*\r?\n', ''
+        # HARD ASSERT: if the ctor-rewrite regex ever fails to match (e.g. the source
+        # signature changes), the class would keep a (ModContainer) ctor. Forge 1.20.1
+        # javafml reflects getDeclaredConstructor() with an empty Class array, so the
+        # game would fail at runtime with NoSuchMethodException. Fail the build instead.
+        if ($c -match 'ModContainer') { throw 'forge staging failed: ModContainer reference left in BiliFixMod.java' }
     }
     [System.IO.File]::WriteAllText($dest, $c, (New-Object System.Text.UTF8Encoding($false)))
 }

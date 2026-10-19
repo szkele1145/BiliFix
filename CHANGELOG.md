@@ -60,7 +60,7 @@
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
   依赖语法已转 `mandatory=`、jar 内 `BiliFixMod.class` 无 `ModContainer` 残留
   （无参构造改写生效），Fabric 断言 `fabric.mod.json` entrypoint 与
-  `BiliFixFabric.class`（89 → 128 项）
+  `BiliFixFabric.class`（89 → 131 项）
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
@@ -77,7 +77,7 @@
   ClassLoader 场景，断言 `Class.forName(fqn, false, loader)` 实际抛出的确是
   `NoClassDefFoundError`（探针 ForNameProbe2 实证 `initialize=false` 同样触发
   链接失败）。负向测试：删 Throwable 兜底、或破坏 NCDFE 判定分支 → `[FAIL]`、
-  退出码 1（89 → 128 项）
+  退出码 1（89 → 131 项）
 - 新增 §17：配置三字段必须 `volatile`——`hwDecoder` / `vout` / `verbose` 由主线程
   的 `load()` 写入，而读方 `JarToolMixin` 经 `PlayerAPI.start() → readArray`
   可能在 watermedia 的**工作线程**上执行。JLS §17.4.5：两线程间若无
@@ -140,8 +140,8 @@
   > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
   > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫、§16 诊断探测守卫、
   > §17 配置可见性守卫、§18 Mixin 目标守卫与 §19 取证污染守卫，
-  > 故当前源码为 128
-  > （`./build.ps1` 实测"通过 128 / 失败 0"）。
+  > 故当前源码为 131
+  > （`./build.ps1` 实测"通过 131 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

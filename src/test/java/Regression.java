@@ -554,9 +554,23 @@ public class Regression {
                         g.matches("(?s).*setForensicsSuppressed\\s*\\(\\s*true\\s*\\).*"));
                 check("取证: 功能自检在 finally 中复位抑制",
                         g.matches("(?s).*finally\\s*\\{[^}]*setForensicsSuppressed\\s*\\(\\s*false\\s*\\).*"));
+                // (g) 功能自检必须**同时**校验 --avcodec-hw 与 --vout：
+                //     只验解码侧会漏掉"vout 没被改写"——而 direct3d11 输出路径
+                //     本身也是崩溃因子之一。
+                check("自检: 功能自检同时校验 avcodec-hw 与 vout",
+                        g.contains("findValue(args, \"--vout\")")
+                                && g.contains("findValue(args, \"--avcodec-hw\")"));
+                // (h) vout=original 是用户**有意**保留原值 → 期望值为 null，
+                //     此时只要参数表里有 --vout 就算符合预期，不该误报失败。
+                check("自检: vout=original（期望 null）不误报",
+                        g.contains("expectedVout == null ? actualVout != null"));
             } else {
                 System.out.println("  [SKIP] 守卫: MixinTargetGuard.java 缺失，跳过源码断言");
             }
+            // (i) findValue 的行为级用例表：自检与 mixin 必须用同一套解析规则，
+            //     否则自检会给出与真实改写相矛盾的结论。
+            check("自检: findValue 解析用例表全绿",
+                    probeFindValueCases());
         }
 
         System.out.println();
@@ -745,6 +759,71 @@ public class Regression {
                 } catch (Exception ignored) { }
             }
         }
+    }
+
+    /**
+     * 行为级证据（§18 扩展）：功能自检的 {@code findValue} 参数解析用例表。
+     *
+     * <p><b>为什么必须有这张表</b>：功能自检与 {@code JarToolMixin} 是**两套
+     * 独立的解析代码**——mixin 负责改写，自检负责核对。若两者的判定规则漂移
+     * （例如自检不认 {@code --key=value} 写法、或把"存在但无值"当成有值），
+     * 自检就会给出与真实改写相矛盾的结论：要么误报"注入未生效"（虚警，
+     * 让用户以为修复坏了），要么误报"通过"（掩盖真失效）。</p>
+     *
+     * <p>本方法镜像 {@code MixinTargetGuard.findValue} 的同构逻辑（Regression 是
+     * 独立镜像，不链接生产类），对覆盖全部形态的用例表逐一验证。任一不符即失败。</p>
+     *
+     * @return true = 全部用例符合预期
+     */
+    static boolean probeFindValueCases() {
+        // {参数数组}, {期望 hw, 期望 vout}；null 用 "(null)" 表示
+        String[][][] cases = {
+            // 标准 "--key value" 形式（加固后）
+            { {"--avcodec-hw", "none", "--vout", "gl,any"}, {"none", "gl,any"} },
+            // 标准形式（加固前，原始危险值——A 线基线形态）
+            { {"--avcodec-hw", "d3d11va,dxva2,any", "--vout", "direct3d11,glwin32,gl,any"},
+              {"d3d11va,dxva2,any", "direct3d11,glwin32,gl,any"} },
+            // "--key=value" 形式
+            { {"--avcodec-hw=none", "--vout=gl,any"}, {"none", "gl,any"} },
+            { {"--avcodec-hw=none", "--vout=direct3d11,glwin32,gl,any"},
+              {"none", "direct3d11,glwin32,gl,any"} },
+            // 缺 --avcodec-hw（只应找到 vout）
+            { {"--vout", "gl,any"}, {"(null)", "gl,any"} },
+            // 裸选项、无值：存在但取不到值 → null（不能把下一个选项当值）
+            { {"--avcodec-hw"}, {"(null)", "(null)"} },
+            { {"--avcodec-hw", "none", "--vout"}, {"none", "(null)"} },
+            // 真实 18 项参数表形态（前后都有干扰项）
+            { {"--no-quiet", "--cr-average=5000", "--avcodec-hw", "none", "--vout", "gl,any",
+               "--http-reconnect"}, {"none", "gl,any"} },
+            // 值恰好以 - 开头（不可能是 VLC 值）→ 不应被当作值消费
+            { {"--avcodec-hw", "--vout", "gl,any"}, {"(null)", "gl,any"} },
+            // null 元素不得导致 NPE（防御：真实参数表理论上不该有 null，但自检不能因此崩）
+            { {"--avcodec-hw", null, "--vout", "gl,any"}, {"(null)", "gl,any"} },
+        };
+        for (String[][] c : cases) {
+            String hw = mirrorFindValue(c[0], "--avcodec-hw");
+            String vout = mirrorFindValue(c[0], "--vout");
+            String hwS = hw == null ? "(null)" : hw;
+            String voutS = vout == null ? "(null)" : vout;
+            if (!hwS.equals(c[1][0]) || !voutS.equals(c[1][1])) return false;
+        }
+        return true;
+    }
+
+    /** {@code MixinTargetGuard.findValue} 的同构镜像（含 null 元素防御） */
+    static String mirrorFindValue(String[] args, String key) {
+        for (int i = 0; i < args.length; i++) {
+            String a = args[i];
+            if (a == null) continue;
+            if (key.equals(a)) {
+                if (i + 1 < args.length && args[i + 1] != null && !args[i + 1].startsWith("-")) {
+                    return args[i + 1];
+                }
+                return null;
+            }
+            if (a.startsWith(key + "=")) return a.substring(key.length() + 1);
+        }
+        return null;
     }
 
     /**

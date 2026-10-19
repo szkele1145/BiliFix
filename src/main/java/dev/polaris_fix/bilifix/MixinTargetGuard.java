@@ -155,32 +155,27 @@ public final class MixinTargetGuard {
                 logger.warn("[BiliFix] ⚠ 功能自检无法判定：readArray({}) 返回 null", PROBE_RESOURCE);
                 return false;
             }
-            String expected = dev.polaris_fix.bilifix.config.BiliFixConfig.hwDecoderValue();
-            for (int i = 0; i < args.length; i++) {
-                if ("--avcodec-hw".equals(args[i])) {
-                    boolean hardened = i + 1 < args.length && expected.equals(args[i + 1]);
-                    if (hardened) {
-                        logger.info("[BiliFix] 功能自检通过: --avcodec-hw={} —— 注入已生效（端到端验证）", expected);
-                    } else {
-                        logger.warn("[BiliFix] ⚠ 功能自检失败：参数仍为原始值 '--avcodec-hw {}'（期望 {}）。"
-                                + "Mixin 注入未生效，本版本修复可能不工作！请向 BiliFix 反馈。",
-                                i + 1 < args.length ? args[i + 1] : "(无值)", expected);
-                    }
-                    return hardened;
-                }
-                if (args[i].startsWith("--avcodec-hw=")) {
-                    boolean hardened = args[i].equals("--avcodec-hw=" + expected);
-                    if (hardened) {
-                        logger.info("[BiliFix] 功能自检通过: {} —— 注入已生效（端到端验证）", args[i]);
-                    } else {
-                        logger.warn("[BiliFix] ⚠ 功能自检失败：参数仍为原始值 '{}'（期望 --avcodec-hw={}）。"
-                                + "Mixin 注入未生效，本版本修复可能不工作！请向 BiliFix 反馈。",
-                                args[i], expected);
-                    }
-                    return hardened;
-                }
+            // 两项都要验：--avcodec-hw 是解码侧（D3D11VA 崩溃根源），--vout 是输出侧
+            // （direct3d11 同样是危险路径）。只验前者会漏掉"vout 没被改写"。
+            String expectedHw = dev.polaris_fix.bilifix.config.BiliFixConfig.hwDecoderValue();
+            String expectedVout = dev.polaris_fix.bilifix.config.BiliFixConfig.voutValue();
+            String actualHw = findValue(args, "--avcodec-hw");
+            String actualVout = findValue(args, "--vout");
+            boolean hwOk = expectedHw.equals(actualHw);
+            // expectedVout == null 表示用户显式设 vout=original（有意保留原值）→
+            // 此时只要参数表里有 --vout 就算符合预期，不误报。
+            boolean voutOk = expectedVout == null ? actualVout != null : expectedVout.equals(actualVout);
+
+            if (hwOk && voutOk) {
+                logger.info("[BiliFix] 功能自检通过: --avcodec-hw={} , --vout={} —— 注入已生效（端到端验证）",
+                        expectedHw, expectedVout == null ? "(保留原值)" : expectedVout);
+                return true;
             }
-            logger.warn("[BiliFix] ⚠ 功能自检无法判定：参数表中未找到 --avcodec-hw（{} 项）", args.length);
+            logger.warn("[BiliFix] ⚠ 功能自检失败：实际 --avcodec-hw={}（期望 {}）, --vout={}（期望 {}）。"
+                    + "Mixin 注入未生效或配置不匹配，本版本修复可能不工作！请向 BiliFix 反馈。",
+                    actualHw == null ? "(缺失)" : actualHw, expectedHw,
+                    actualVout == null ? "(缺失)" : actualVout,
+                    expectedVout == null ? "(保留原值)" : expectedVout);
             return false;
         } catch (ClassNotFoundException e) {
             // watermedia 未安装：与 evaluate() 同一判定，正常情况，静默
@@ -193,6 +188,33 @@ public final class MixinTargetGuard {
             // 必须复位：否则之后用户真的播放媒体时，取证数据会被永久抑制
             dev.polaris_fix.bilifix.CrashSentinel.setForensicsSuppressed(false);
         }
+    }
+
+    /**
+     * 从 VLC 参数数组中取出某个长选项的值。
+     *
+     * <p>同时支持 {@code "--key value"} 与 {@code "--key=value"} 两种 VLC 写法
+     * （与 {@code JarToolMixin} 的解析规则保持一致——自检与实际改写必须用同一套
+     * 判定，否则自检会给出与真实行为相矛盾的结论）。</p>
+     *
+     * @return 找到的值；该选项不存在时返回 null
+     */
+    private static String findValue(String[] args, String key) {
+        for (int i = 0; i < args.length; i++) {
+            String a = args[i];
+            if (a == null) continue;
+            if (key.equals(a)) {
+                // "--key value" 形式：值必须不以 "-" 开头（VLC 值不会以 - 开头）
+                if (i + 1 < args.length && args[i + 1] != null && !args[i + 1].startsWith("-")) {
+                    return args[i + 1];
+                }
+                return null;   // 存在但无值（如单独的 --vout）
+            }
+            if (a.startsWith(key + "=")) {
+                return a.substring(key.length() + 1);
+            }
+        }
+        return null;
     }
 
     /** 功能探测用的资源名：与 PlayerAPI 实际读取的完全一致（javap 实证） */

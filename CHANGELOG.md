@@ -60,7 +60,7 @@
   静默丢失）；Forge 断言 MANIFEST `MixinConfigs`、`[[mixins]]` 块已剥离、
   依赖语法已转 `mandatory=`、jar 内 `BiliFixMod.class` 无 `ModContainer` 残留
   （无参构造改写生效），Fabric 断言 `fabric.mod.json` entrypoint 与
-  `BiliFixFabric.class`（89 → 113 项）
+  `BiliFixFabric.class`（89 → 116 项）
 - 新增 §14：断言生产源码中 `CrashSentinel.record` 声明为 `synchronized`
   （Regression 是独立镜像，镜像一份"已修复"的逻辑再测它等于没测，故直接读源码
   断言；已做负向测试——临时删掉该关键字时用例 `[FAIL]`、退出码 1）
@@ -77,13 +77,21 @@
   ClassLoader 场景，断言 `Class.forName(fqn, false, loader)` 实际抛出的确是
   `NoClassDefFoundError`（探针 ForNameProbe2 实证 `initialize=false` 同样触发
   链接失败）。负向测试：删 Throwable 兜底、或破坏 NCDFE 判定分支 → `[FAIL]`、
-  退出码 1（89 → 113 项）
+  退出码 1（89 → 116 项）
+- 新增 §17：配置三字段必须 `volatile`——`hwDecoder` / `vout` / `verbose` 由主线程
+  的 `load()` 写入，而读方 `JarToolMixin` 经 `PlayerAPI.start() → readArray`
+  可能在 watermedia 的**工作线程**上执行。JLS §17.4.5：两线程间若无
+  happens-before 边，写方的值对读方不保证可见 → 媒体线程可能一直读到类
+  初始化时的旧值，**用户的自定义配置静默失效**（默认值恰是安全值，崩溃不会
+  回来，但 `hwDecoder = "any"` 之类的高危自定义可能读不到）。三个字段改为
+  `volatile`（引用写入本就原子，只补可见性，运行时零成本）。
+  负向测试：去掉任一 `volatile` → `[FAIL]`、退出码 1
 - 资源守卫用例补齐：`fixArgs` 在资源缺失 / 空数组 / null 元素时原样返回副本，
   以及"尾部 `--avcodec-hw` 缺值"与 `vout=null` 追加顺序等边界（66 → 85）
   > 说明：上一条 1.4.7 条目里的 66 是**发布当时**的真实值；此后 b273823 又补了
   > 19 项，v1.4.8 又加了 §9.6b 变体 jar 守卫、Forge 三处机制差异断言、§14 并发
-  > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫与 §16 诊断探测守卫，
-  > 故当前源码为 113（`./build.ps1` 实测"通过 113 / 失败 0"）。
+  > 守卫、§15 配置目录守卫、Forge 构造器字节级守卫、§16 诊断探测守卫与
+  > §17 配置可见性守卫，故当前源码为 116（`./build.ps1` 实测"通过 116 / 失败 0"）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：

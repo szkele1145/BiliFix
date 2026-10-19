@@ -23,12 +23,22 @@ import java.util.Map;
  *   verbose   = true|false                                        打印替换详情
  */
 public final class BiliFixConfig {
-    /** 软解（默认，最稳定，修复崩溃） */
-    public static String hwDecoder = "none";
-    /** 视频输出：默认去掉 direct3d11 偏好 */
-    public static String vout = "gl,any";
-    /** 是否在日志打印完整参数对比 */
-    public static boolean verbose = false;
+    /**
+     * 软解（默认，最稳定，修复崩溃）。
+     *
+     * <p><b>必须 volatile</b>：load() 在主线程（mod 构造）里写，而
+     * {@code JarToolMixin} 经 {@code PlayerAPI.start() → readArray} 可能在
+     * watermedia 的工作线程上读。JLS §17.4.5：两条线程间没有 happens-before
+     * 边，写方的值对读方**不保证可见**——媒体线程可能永远读到类初始化时的
+     * 旧默认值，用户的自定义配置静默失效。默认值恰好也是安全值（崩溃不会
+     * 回来），但 {@code hwDecoder = "any"} 之类的高危自定义可能读不到。
+     * 引用写入本身原子，volatile 只补可见性，零运行时成本。</p>
+     */
+    public static volatile String hwDecoder = "none";
+    /** 视频输出：默认去掉 direct3d11 偏好（volatile 理由同 {@link #hwDecoder}） */
+    public static volatile String vout = "gl,any";
+    /** 是否在日志打印完整参数对比（volatile 理由同 {@link #hwDecoder}） */
+    public static volatile boolean verbose = false;
 
     /**
      * 外部注入的配置目录（Fabric 侧用）。为 null 时回退到 FML 的 CONFIGDIR，

@@ -458,6 +458,31 @@ public class Regression {
                     classForNameErrorIsNoClassDefFoundError());
         }
 
+        // ============ 17. 配置字段必须 volatile（跨线程可见性） ============
+        // BiliFixConfig 的三个可配置字段由主线程的 load() 写入，而读方
+        // JarToolMixin 经 watermedia 的 PlayerAPI.start() → readArray
+        // 可能在**工作线程**上执行。JLS §17.4.5：两条线程之间若没有
+        // happens-before 边，写方的值对读方不保证可见——媒体线程可能一直
+        // 读到类初始化时的旧值，用户的自定义配置静默失效
+        // （默认值恰是安全值，故崩溃不会回来，但 "hwDecoder = any" 之类
+        //  的高危自定义可能读不到）。
+        // 引用写入本身是原子的，volatile 只补可见性，运行时零成本。
+        {
+            Path cfgSrc = Paths.get("src", "main", "java", "dev", "polaris_fix",
+                                  "bilifix", "config", "BiliFixConfig.java");
+            if (Files.exists(cfgSrc)) {
+                String src = Files.readString(cfgSrc, StandardCharsets.UTF_8);
+                check("配置: hwDecoder 声明为 volatile",
+                        src.matches("(?s).*public\\s+static\\s+volatile\\s+String\\s+hwDecoder\\s*=.*"));
+                check("配置: vout 声明为 volatile",
+                        src.matches("(?s).*public\\s+static\\s+volatile\\s+String\\s+vout\\s*=.*"));
+                check("配置: verbose 声明为 volatile",
+                        src.matches("(?s).*public\\s+static\\s+volatile\\s+boolean\\s+verbose\\s*=.*"));
+            } else {
+                System.out.println("  [SKIP] 配置: BiliFixConfig.java 缺失，跳过源码断言");
+            }
+        }
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) System.exit(1);

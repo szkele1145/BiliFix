@@ -131,7 +131,7 @@ if (Test-Path $ghTokenFile) {
         Write-Host "  no Release for v$version - creating tag + release..." -ForegroundColor Yellow
         $notes = "BiliFix $version"
         try {
-            $cl = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'CHANGELOG.md'), [System.Text.Encoding]::UTF8)
+            $cl = [System.IO.File]::ReadAllText((Join-Path $root 'CHANGELOG.md'), [System.Text.Encoding]::UTF8)
             $esc = [regex]::Escape($version)
             $m = [regex]::Match($cl, "(?s)## $esc[^\n]*\n(.*?)(?:\n## |\z)")
             if ($m.Success -and $m.Groups[1].Value.Trim()) { $notes = $m.Groups[1].Value.Trim() }

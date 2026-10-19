@@ -39,12 +39,12 @@
 
    ```
    [BiliFix] Mixin 注入目标自检通过: org.watermedia.core.tools.JarTool.readArray(String) 唯一匹配
-   [BiliFix] 功能自检通过: --avcodec-hw=none —— 注入已生效（端到端验证）
+   [BiliFix] 功能自检通过: --avcodec-hw=none , --vout=gl,any —— 注入已生效（端到端验证）
    ```
 
    - [ ] 出现「Mixin 注入目标自检通过」行
    - [ ] 出现「**功能自检通过**」行 —— 这行是**端到端**证据：它真的调用了一次
-     `JarTool.readArray`，并确认返回的 `--avcodec-hw` 已是安全值
+     `JarTool.readArray`，并确认返回的 `--avcodec-hw` **和** `--vout` 都已是安全值
    - [ ] 若出现任何 `⚠` 开头的 BiliFix 警告行 → **判定不通过**（说明注入未生效，
      崩溃会回来）
 

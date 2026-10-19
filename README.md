@@ -128,7 +128,7 @@ Then play the video that previously crashed the game — it should no longer exi
 ## Building From Source
 
 ```powershell
-./build.ps1           # compile + run 105 regression tests + package (NeoForge 1.21.1)
+./build.ps1           # compile + run 107 regression tests + package (NeoForge 1.21.1)
 ./build-forge.ps1     # Forge 1.20.1 variant
 ./build-fabric.ps1    # Fabric 1.20.1 variant
 ```
@@ -136,6 +136,19 @@ Then play the video that previously crashed the game — it should no longer exi
 The script auto-detects the JDK 21 (Minecraft runtime works) and the game
 libraries folder. Overrides: `BILIFIX_JAVAC=<javac path>`, `BILIFIX_LIBS=<libraries dir>`,
 `-WatermediaJar <path>`.
+
+## Deploying
+
+```powershell
+./deploy.ps1 -Variant neoforge   # into the 1.21.1 NeoForge instance
+./deploy.ps1 -Variant fabric     # into the 1.20.1 Fabric instance
+./deploy.ps1 -Variant forge      # needs BILIFIX_INSTANCE=<dir> (no known Forge bed)
+./deploy.ps1 -Variant fabric -SkipRemote   # local mods folder only
+```
+
+Deploys the matching `build/` jar into the instance's `mods/` folder (removing
+older BiliFix jars first) and, unless `-SkipRemote`, syncs the GitHub Release
+assets incrementally (per-variant; other variants' assets are never touched).
 
 ## Documentation
 

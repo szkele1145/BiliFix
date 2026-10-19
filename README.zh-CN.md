@@ -120,12 +120,25 @@ verbose = false
 ## 从源码构建
 
 ```powershell
-./build.ps1            # 编译 + 105 项回归测试 + 打包（NeoForge 1.21.1）
+./build.ps1            # 编译 + 107 项回归测试 + 打包（NeoForge 1.21.1）
 ./build-forge.ps1      # Forge 1.20.1 变体
 ./build-fabric.ps1     # Fabric 1.20.1 变体
 ```
 
 脚本自动探测 JDK 21（Minecraft 运行时即可）与游戏库目录。可用环境变量覆盖：BILIFIX_JAVAC、BILIFIX_LIBS，或参数 -WatermediaJar。
+
+## 部署
+
+```powershell
+./deploy.ps1 -Variant neoforge   # 部署进 1.21.1 NeoForge 实例
+./deploy.ps1 -Variant fabric     # 部署进 1.20.1 Fabric 实例
+./deploy.ps1 -Variant forge      # 需 BILIFIX_INSTANCE=<目录>（暂无 Forge 测试床）
+./deploy.ps1 -Variant fabric -SkipRemote   # 只部署本地 mods 目录
+```
+
+把 `build/` 里对应的 jar 部署到实例 `mods/` 目录（先清除旧 BiliFix jar）；
+不加 `-SkipRemote` 时还会**增量**同步 GitHub Release 资产（按变体各自处理，
+不会触碰其他变体的资产）。
 
 ## 文档索引
 

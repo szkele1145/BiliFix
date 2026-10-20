@@ -110,6 +110,8 @@ After launching, the log should contain:
 
 ```
 [BiliFix] v1.4.8 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] Mixin 注入目标自检通过: org.watermedia.core.tools.JarTool.readArray(String) 唯一匹配
+[BiliFix] 功能自检通过: --avcodec-hw=none , --vout=gl,any —— 注入已生效（端到端验证）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
 ```
 
@@ -117,6 +119,19 @@ After launching, the log should contain:
 > (18 with 2.1.36/2.1.37 — `javap` confirms `JarTool.readArray(String)` has the
 > same signature in both). What matters is that both hardening entries were
 > replaced and the total count is unchanged — no argument was dropped.
+
+### Reading these lines
+
+| Log line | Meaning | If it is missing |
+| --- | --- | --- |
+| `Mixin 注入目标自检通过` | The injection point was found and matched uniquely | `⚠ 功能自检无法判定` or `功能自检失败` means the mixin did **not** take effect, so neither did the fix |
+| `功能自检通过: --avcodec-hw=... , --vout=...` | **End-to-end proof**: `readArray` was really invoked and both arguments were confirmed rewritten | This line is the verdict — it proves behaviour, not "the code looks right" |
+| `VLC 参数已加固` | The rewrite actually fired while playing media | Its absence just means you have not played a video yet (**not** a fault) |
+
+> **Since v1.4.8** the `功能自检通过` line is produced by the startup self-check,
+> so you can confirm the fix works **without playing a video**. The self-check
+> runs through `CrashSentinel`'s forensics-suppression switch, so it does not
+> pollute the "did the user really play media" forensic field.
 
 Then play the video that previously crashed the game — it should no longer exit.
 

@@ -226,5 +226,22 @@ try {
     & $javaExe -cp "$fmlDir;$outClasses" FmlBridgeProbe
     if ($LASTEXITCODE -ne 0) { throw 'FmlBridge probe FAILED (fmlDir chain or the no-throw contract broke)' }
     Write-Host 'FmlBridge probe OK' -ForegroundColor Green
+
+    # README drift probe: the READMEs quote the exact log lines users look for.
+    $rmDir = Join-Path $OutDir 'readme-probe'
+    New-Item -ItemType Directory -Force -Path $rmDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp $outClasses -d $rmDir (Join-Path $root 'src\test\java\ReadmeLogSampleProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'README probe compile failed' }
+    $slf4jJar = (Get-ChildItem "$libs\slf4j-api*.jar" | Select-Object -First 1).FullName
+    # Start-Process with redirected streams: SLF4J's "No SLF4J providers" notice
+    # goes to stderr and PowerShell would turn it into a fatal error record even
+    # though the probe passed. The process exit code is the verdict.
+    $rmCp = "$rmDir;$outClasses;$slf4jJar"
+    $rmP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', $rmCp, 'ReadmeLogSampleProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$rmDir\stdout.txt" -RedirectStandardError "$rmDir\stderr.txt"
+    Get-Content "$rmDir\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+    if ($rmP.ExitCode -ne 0) { throw 'README probe FAILED (README log samples drifted from the production output)' }
+    Write-Host 'README probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

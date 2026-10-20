@@ -107,12 +107,26 @@ verbose = false
 [BiliFix] v1.4.8 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] ==== BiliFix 环境诊断 ====
 [BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
+[BiliFix] Mixin 注入目标自检通过: org.watermedia.core.tools.JarTool.readArray(String) 唯一匹配
+[BiliFix] 功能自检通过: --avcodec-hw=none , --vout=gl,any —— 注入已生效（端到端验证）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
 ```
 
 > 括号里的参数数量由 watermedia 决定，会随其版本变化（2.1.36/2.1.37 实测均为 18 项，
 > `javap` 已确认两版 `JarTool.readArray(String)` 签名一致）；
 > 关键是两个加固项已替换、且总项数不变（没有丢参数）。
+
+### 怎么看懂这几行
+
+| 日志行 | 含义 | 缺失说明什么 |
+| --- | --- | --- |
+| `Mixin 注入目标自检通过` | 找到了唯一匹配的注入点 | 出现 `⚠ 功能自检无法判定` 或 `功能自检失败` 则注入未生效，**修复也就没生效** |
+| `功能自检通过: --avcodec-hw=... , --vout=...` | **端到端验证**：真的调用了一次 `readArray` 并确认两个参数已被改写 | 这行是最终判据——它证明的是行为，不是"代码看起来在" |
+| `VLC 参数已加固` | 实际播放媒体时触发了改写 | 没这行说明你还没播放过视频（**这很正常**，不是故障） |
+
+> **v1.4.8 起**，`功能自检通过` 那一行由启动时的自检产生（不是播放视频才有），
+> 所以**不播放视频也能确认修复是否生效**。它通过 `CrashSentinel` 的取证抑制开关
+> 发起自检，不会污染"是否真的播放过媒体"这一取证字段。
 
 然后播放之前必崩的视频，游戏不再退出。
 

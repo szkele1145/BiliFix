@@ -123,6 +123,33 @@ if (Test-Path "$root\src\test\java\FmlBridgeProbe.java") {
     Write-Host "FmlBridge probe OK" -ForegroundColor Green
 }
 
+# README drift probe (v1.4.8): the READMEs quote the exact log lines a user
+# should look for. If the production format string changes and the READMEs are
+# not updated, the user sees a log that does not match the documentation and
+# wrongly concludes the fix did not apply. This probe compares the README
+# files against the real production literals.
+if (Test-Path "$root\src\test\java\ReadmeLogSampleProbe.java") {
+    $rmOut = "$OutDir\readme-probe"
+    New-Item -ItemType Directory -Force -Path $rmOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$lib\org\slf4j\slf4j-api\2.0.7\slf4j-api-2.0.7.jar" -d $rmOut "$root\src\test\java\ReadmeLogSampleProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "README probe compile failed" }
+    Push-Location $root
+    # SLF4J prints "No SLF4J providers were found." to stderr when only the API
+    # jar is on the classpath. That is a harmless notice, but PowerShell turns
+    # native stderr into an error record that aborts the build even though the
+    # probe passed. Start-Process with redirected streams keeps them apart;
+    # the exit code is the verdict.
+    $rmCp = "$rmOut;$OutDir\classes;$lib\org\slf4j\slf4j-api\2.0.7\slf4j-api-2.0.7.jar"
+    $rmP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', $rmCp, 'ReadmeLogSampleProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$rmOut\stdout.txt" -RedirectStandardError "$rmOut\stderr.txt"
+    Pop-Location
+    Get-Content "$rmOut\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+    # Start-Process does not update $LASTEXITCODE - use the process exit code.
+    if ($rmP.ExitCode -ne 0) { throw "README probe FAILED (README log samples drifted from the production output)" }
+    Write-Host "README probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

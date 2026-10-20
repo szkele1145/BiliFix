@@ -375,6 +375,12 @@ public class Regression {
         // 并发调用生产方法——镜像一份"已修复"的逻辑再测它等于什么都没测。这里改为
         // 直接读生产源码，断言 record 声明了 synchronized：若有人删掉这个关键字，
         // 上限就不再是硬保证，本用例必须 FAIL。
+        //
+        // 行为级证据（df8c030 后补充，out/concurrency-probe/ConcurrentRecordProbe.java）：
+        // 探针直接链接生产 classes，32 线程 × 500 次并发调用生产 record()，
+        // 事件数恰好停在 64 = MAX_EVENTS（HARD_CAP_HELD=true，RESULT=PASS）。
+        // synchronized 关键字存在（本断言）+ 并发压力下上限确被守住（探针实证）
+        // 两者合起来才是完整证据链；任一侧丢失即视为回归。
         {
             Path sentinel = Paths.get("src", "main", "java", "dev", "polaris_fix",
                                       "bilifix", "CrashSentinel.java");

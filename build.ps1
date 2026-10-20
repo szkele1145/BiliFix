@@ -1,4 +1,4 @@
-﻿# Build script (PowerShell, Windows)
+# Build script (PowerShell, Windows)
 # Requires: local Minecraft runtime JDK (javac/jar), NeoForge 21.1 libs, mixin 0.8.5, watermedia jar
 # Usage: ./build.ps1 [-WatermediaJar <path>] [-OutDir <dir>]
 #
@@ -86,6 +86,23 @@ if (Test-Path "$root\src\test\java\Regression.java") {
     & $javaExe -cp "$OutDir\test" Regression
     if ($LASTEXITCODE -ne 0) { throw "regression tests failed" }
     Write-Host "Regression tests OK" -ForegroundColor Green
+}
+
+# Behaviour-level concurrency probe (v1.4.8).
+# Regression is an independent mirror (it does not link the production classes),
+# so it cannot call the production CrashSentinel.record() directly. Its §14
+# assertion only checks that the `synchronized` keyword is present - that is
+# "checking the prescription", not the effect. This probe links the production
+# classes and hammers the real method: 32 threads x 500 records must leave the
+# event list at exactly MAX_EVENTS.
+if (Test-Path "$root\src\test\java\ConcurrentRecordProbe.java") {
+    $probeOut = "$OutDir\concurrency-probe"
+    New-Item -ItemType Directory -Force -Path $probeOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes" -d $probeOut "$root\src\test\java\ConcurrentRecordProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "concurrency probe compile failed" }
+    & $javaExe -cp "$probeOut;$OutDir\classes" ConcurrentRecordProbe
+    if ($LASTEXITCODE -ne 0) { throw "concurrency probe FAILED (event cap not held under load)" }
+    Write-Host "Concurrency probe OK" -ForegroundColor Green
 }
 
 # Package

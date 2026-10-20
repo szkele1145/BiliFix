@@ -46,7 +46,10 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 ## Infrastructure
 
 - ✅ One-command build (137 tests + jar integrity gate)
-- ✅ **All three build scripts run the full suite** - Regression (137) plus seven
+- ✅ **Every production class has a behaviour probe that links it** (9/9):
+  `BiliFixMod`, `CrashSentinel`, `EnvironmentDiagnostics`, `MixinTargetGuard`,
+  `BiliFixConfig`, `JarToolMixin`, `FmlBridge`
+- ✅ **All three build scripts run the full suite** - Regression (137) plus eight
   behaviour probes that link the production classes: `ConcurrentRecordProbe`
   (event cap under 32-thread load), `FmlBridgeProbe` (FML reflection chain
   against stub classes under the real package names), `ReadmeLogSampleProbe`
@@ -54,15 +57,18 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   (the GPU model really reaches the diagnostic report),
   `ArgumentRewriteProbe` (the hardening logic itself, which until now was
   never executed by any test), `ForensicsSuppressionProbe` (the startup
-  self-check's suppression must not leak across threads) and
+  self-check's suppression must not leak across threads),
   `ConfigParseProbe` (a UTF-8 BOM in the config file must not drop the
-  user's first setting). Previously only
+  user's first setting) and `MixinTargetGuardProbe` (the guard that turns a
+  silent mixin skip into a visible warning, checked against real stub
+  classes). Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
   concurrency (event list exceeds the cap), FML bridge (missing `get()`),
   README (version drift), GPU (reverted to the class-key query), argument
   rewrite (old value kept / `=` form unrewritten), forensics (suppression
-  leaks across threads), config parse (BOM-unaware parser)
+  leaks across threads), config parse (BOM-unaware parser), mixin target
+  guard (overload / missing-target detection removed)
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)

@@ -28,6 +28,24 @@
   FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
 
 ### 新增
+- **Mixin 目标自检探针**（`src/test/java/MixinTargetGuardProbe.java`，34 断言）：
+  `MixinTargetGuard` 此前**只有镜像覆盖**——而它是唯一能把"Mixin 静默跳过"
+  变成启动日志里一条警告的机制，正是整个修复的成败关键
+  - 手法：目标类名是硬编码常量，同一 JVM 内换不掉 → 探针用**外部 javac 进程**
+    编译出多种 stub 形态（签名匹配 / 多一个重载 / 方法缺失 / 签名不对 / 类不存在），
+    再用**子类优先的 URLClassLoader** 加载，使
+    `MixinTargetGuard.class.getClassLoader()` 指向该加载器、目标解析到 stub
+  - 覆盖全部四种判定：`OK` / `SIGNATURE_MISMATCH` / `AMBIGUOUS_OR_MISSING` /
+    `WATERMEDIA_ABSENT`（后者必须记 info 而非 warn——没装 watermedia 是正常情况）
+  - `functionalProbe` 必须能分辨"已加固"与"仍是危险值（d3d11va / direct3d11）"，
+    并能报出返回 null
+  - **踩坑记录**：`ToolProvider.getSystemJavaCompiler()` 在探针进程内会失败
+    （`NoClassDefFoundError: gson`）→ 改用外部 javac 进程；
+    `productionClassesUrl()` 必须取 **`MixinTargetGuard` 的** CodeSource 而非探针自己的
+    ——取错会让生产类由父加载器加载，stub 形态全部退化成 `WATERMEDIA_ABSENT`
+    （已实测）
+  - **负向测试实证**（`out/neg-guard.ps1`）：删掉重载判定与目标缺失判定 → 5 条失败
+  - **生产类覆盖率现为 9/9**——每个生产类都有至少一个链接它的行为探针
 - **配置解析探针**（`src/test/java/ConfigParseProbe.java`，18 断言）：反射调用生产
   `parse()`，覆盖 UTF-8 BOM / 无 BOM / BOM+注释 / BOM+空行，以及引号内嵌 `#`、
   行内注释、裸值等既有能力的回归守护。**已接入三个构建脚本**

@@ -46,6 +46,7 @@ src/test/java/GpuDetectProbe.java         # links production classes: GPU detect
 src/test/java/ArgumentRewriteProbe.java   # links production classes: the hardening logic itself
 src/test/java/ForensicsSuppressionProbe.java  # links production classes: suppression must not leak across threads
 src/test/java/ConfigParseProbe.java      # links production classes: a UTF-8 BOM must not drop the first setting
+src/test/java/MixinTargetGuardProbe.java # links production classes: the silent-skip guard, vs real stubs
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
@@ -62,7 +63,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -90,6 +91,14 @@ link the real classes and exercise them:
   `Files.readAllLines` does not strip it, so `hwDecoder` would be silently
   ignored while `vout` and `verbose` kept working - the config looks "half
   applied" and nothing points at the BOM.
+- `MixinTargetGuardProbe` - the guard that turns a silent mixin skip into a
+  visible warning, checked against real stub classes. The target class name is
+  a hard-coded constant, so the probe compiles several stub shapes with an
+  external `javac` process and loads each through a child-first
+  `URLClassLoader`; then it calls the real `evaluate()`, `check(Logger)` and
+  `functionalProbe(Logger)`. All four `Status` values are covered, including
+  `WATERMEDIA_ABSENT` - which must log info, not warn, because watermedia
+  simply being absent is normal.
 - `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
   a real `CallbackInfoReturnable`. This is the core of the fix, and until this
   probe existed **nothing ever executed it**: the mirror cannot catch a bug in

@@ -341,6 +341,21 @@ if (Test-Path "$root\src\test\java\StartupLogTruthProbe.java") {
     Get-Content "$mpOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($mpP.ExitCode -ne 0) { throw "Mirror parity probe FAILED (the regression mirror disagrees with production)" }
     Write-Host "Mirror parity probe OK" -ForegroundColor Green
+    # Fabric init probe: the Fabric loader is the ONLY one with its own
+    # entry point (ModInitializer -> explicit directory injection), so the
+    # injection order inside BiliFixMod.init() is semantic. Load the config
+    # before the dirs are injected and the config file lands somewhere else
+    # entirely - silently, with no error.
+    $fiOut = "$OutDir\fabricinit-probe"
+    New-Item -ItemType Directory -Force -Path $fiOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $fiOut "$root\src\test\java\FabricInitProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Fabric init probe compile failed" }
+    $fiP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$fiOut;$OutDir\classes;$slf4jJar", 'FabricInitProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$fiOut\stdout.txt" -RedirectStandardError "$fiOut\stderr.txt"
+    Get-Content "$fiOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($fiP.ExitCode -ne 0) { throw "Fabric init probe FAILED" }
+    Write-Host "Fabric init probe OK" -ForegroundColor Green
 
     # Null element probe: a null entry in the argument array must not make the
     # hardening logic throw. JarTool.readArray is a GENERAL method - watermedia

@@ -1,0 +1,86 @@
+﻿$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# Negative test for FabricInitProbe.
+#
+# Purpose: a probe that cannot fail proves nothing. This breaks the
+# production code in a COPY of the source and requires the probe to fail.
+#
+# The break: BiliFixMod.init() loads the config BEFORE the injected
+# directories are set. The config file then lands wherever the fallback
+# says (the working directory) instead of in the injected config dir.
+#
+# Why that matters: the mod keeps working - only the user's settings
+# stop taking effect, and nothing says why. It is exactly the kind of
+# silent failure this project keeps hunting down, and the Fabric path is
+# the one loader that goes through the explicit injection.
+
+$d = 'C:\Users\一只屑\Desktop\BiliFix'
+$javac = "$d\.tools\jdk21\bin\javac.exe"
+$java  = "$d\.tools\jdk21\bin\java.exe"
+$slf4j = "$d\build\fabric\libs\slf4j-api-2.0.7.jar"
+$mixin = (Get-ChildItem "$d\build\fabric\libs" -Filter 'mixin-*.jar' | Select-Object -First 1).FullName
+$cp = "$slf4j;$mixin"
+
+$tmp = Join-Path $env:TEMP ('bilifix-neg-fabricinit-' + [guid]::NewGuid().ToString('N').Substring(0,8))
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path "$tmp\out" | Out-Null
+Write-Host "[neg] 准备临时副本: $tmp"
+
+# 1) copy the whole main source tree
+$src = "$d\src\main\java"
+Get-ChildItem $src -Recurse -Filter '*.java' | ForEach-Object {
+    $rel = $_.FullName.Substring($src.Length + 1)
+    $dst = Join-Path "$tmp\src" $rel
+    $dd = Split-Path $dst -Parent
+    if (-not (Test-Path $dd)) { New-Item -ItemType Directory -Force -Path $dd | Out-Null }
+    Copy-Item $_.FullName $dst -Force
+}
+
+# 2) break BiliFixMod.init(): load the config BEFORE the dirs are injected
+$target = "$tmp\src\dev\polaris_fix\bilifix\BiliFixMod.java"
+$text = [System.IO.File]::ReadAllText($target, [System.Text.Encoding]::UTF8)
+$old = @'
+        if (configDir != null) BiliFixConfig.setConfigDir(configDir);
+        if (gameDir != null) CrashSentinel.setGameDir(gameDir);
+        BiliFixConfig.load();
+'@
+$new = @'
+        BiliFixConfig.load();
+        if (configDir != null) BiliFixConfig.setConfigDir(configDir);
+        if (gameDir != null) CrashSentinel.setGameDir(gameDir);
+'@
+if (-not $text.Contains($old)) { Write-Host '[neg] 失败：锚点没找到（init 的注入顺序）'; exit 1 }
+$text = $text.Replace($old, $new)
+[System.IO.File]::WriteAllText($target, $text, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host '[neg] 已还原：init 先 load 配置再注入目录（配置会落到别处）'
+
+# 3) compile the broken production tree
+$prod = Get-ChildItem "$tmp\src" -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+$stubs = Get-ChildItem "$d\src\test\stubs\ci" -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+& $javac -encoding UTF-8 -proc:none -cp $cp -d "$tmp\out" @prod @stubs 2>&1 |
+    Select-Object -First 4 | ForEach-Object { "  $($_.ToString())" }
+if ($LASTEXITCODE -ne 0) { Write-Host '[neg] 失败：还原后源码编译不过'; exit 1 }
+
+# 4) compile the probe
+& $javac -encoding UTF-8 -proc:none -cp "$tmp\out;$cp" -d "$tmp\out" "$d\src\test\java\FabricInitProbe.java" 2>&1 |
+    Select-Object -First 4 | ForEach-Object { "  $($_.ToString())" }
+if ($LASTEXITCODE -ne 0) { Write-Host '[neg] 失败：探针编译不过'; exit 1 }
+
+# 5) run the probe against the BROKEN COPY - it MUST fail
+$proc = Start-Process -FilePath $java -ArgumentList @('-cp', "$tmp\out;$cp", 'FabricInitProbe') `
+        -NoNewWindow -Wait -PassThru -WorkingDirectory $tmp `
+        -RedirectStandardOutput "$tmp\stdout.txt" -RedirectStandardError "$tmp\stderr.txt"
+
+Write-Host '[neg] 探针输出：'
+Get-Content "$tmp\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
+
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+
+if ($proc.ExitCode -eq 0) {
+    Write-Host '[neg] 失败：探针对坏代码 PASS 了 —— 断言无效！'
+    exit 1
+}
+Write-Host ("[neg] 探针在坏代码上失败（exit {0}）—— 断言有效" -f $proc.ExitCode)
+Write-Host 'NEGATIVE_TEST_OK'
+exit 0

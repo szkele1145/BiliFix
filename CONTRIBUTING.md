@@ -51,10 +51,16 @@ src/test/java/StartupLogTruthProbe.java  # links production classes: the startup
 src/test/java/ForensicsVoutProbe.java    # links production classes: the diagnostics file must not say vout=null
 src/test/java/UnknownConfigKeyProbe.java  # links production classes: a mistyped config key must be visible
 src/test/java/NullElementProbe.java       # links production classes: a null argument entry must not crash the mixin
+src/test/java/FmlModVersionProbe.java      # links production classes: FmlBridge.modVersion's success path
+src/test/stubs-fmlmodlist/                 # ModList + IModFileInfo stubs (kept OUT of src/test/stubs on purpose)
 src/test/negative/                         # negative tests: every probe must be able to fail
 src/test/negative/run-all-negative-tests.ps1  # runs all of them; any failure fails the build
 src/test/stubs/slf4j/          # a capturing SLF4J provider, so log output can be asserted on
 src/test/stubs/               # stub FML classes under the REAL package names
+                              #   (deliberately WITHOUT a ModList: FmlBridgeProbe needs that
+                              #    absence to be testable - the ModList stub lives in
+                              #    src/test/stubs-fmlmodlist/ so it only reaches
+                              #    FmlModVersionProbe)
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
 build-forge.ps1    # Forge 1.20.1 variant (see docs/cross-loader-research.md)

@@ -124,6 +124,27 @@ if (Test-Path "$root\src\test\java\FmlBridgeProbe.java") {
     Write-Host "FmlBridge probe OK" -ForegroundColor Green
 }
 
+# FmlModVersion probe: FmlBridge.modVersion's SUCCESS path. It was untested -
+# FmlBridgeProbe only covered the "ModList absent" degradation. Real FML
+# (javap, 2026-10-21) has getModFileById on the concrete class returning the
+# IModFileInfo INTERFACE with a package-private implementation. If that path
+# breaks, EnvironmentDiagnostics reports an installed watermedia as missing.
+# Its stubs live in a separate directory so the classpath of FmlBridgeProbe
+# above still has no ModList (that environment is what its probe needs).
+if (Test-Path "$root\src\test\java\FmlModVersionProbe.java") {
+    $fmvOut = "$OutDir\fmlmodver-probe"
+    New-Item -ItemType Directory -Force -Path $fmvOut | Out-Null
+    $mvStubs = Get-ChildItem "$root\src\test\stubs-fmlmodlist" -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes" -d $fmvOut @mvStubs "$root\src\test\java\FmlModVersionProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "FmlModVersion probe compile failed" }
+    $fmvP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$fmvOut;$OutDir\classes", 'FmlModVersionProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$fmvOut\stdout.txt" -RedirectStandardError "$fmvOut\stderr.txt"
+    Get-Content "$fmvOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($fmvP.ExitCode -ne 0) { throw "FmlModVersion probe FAILED (modVersion success path or the no-throw contract broke)" }
+    Write-Host "FmlModVersion probe OK" -ForegroundColor Green
+}
+
 # README drift probe (v1.4.8): the READMEs quote the exact log lines a user
 # should look for. If the production format string changes and the READMEs are
 # not updated, the user sees a log that does not match the documentation and

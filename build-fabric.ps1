@@ -235,6 +235,24 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'FmlBridge probe FAILED (fmlDir chain or the no-throw contract broke)' }
     Write-Host 'FmlBridge probe OK' -ForegroundColor Green
 
+    # FmlModVersion probe: FmlBridge.modVersion's SUCCESS path (it was
+    # untested - FmlBridgeProbe only covered the "ModList absent" degradation).
+    # Real FML returns the IModFileInfo INTERFACE with a package-private
+    # implementation; if that path breaks, EnvironmentDiagnostics reports an
+    # installed watermedia as missing. Its stubs live in a separate directory
+    # so the FmlBridgeProbe classpath above still has no ModList.
+    $fmvDir = Join-Path $OutDir 'fmlmodver-probe'
+    New-Item -ItemType Directory -Force -Path $fmvDir | Out-Null
+    $mvStubs = Get-ChildItem (Join-Path $root 'src\test\stubs-fmlmodlist') -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+    & $javac -encoding UTF-8 -proc:none -cp $outClasses -d $fmvDir @mvStubs (Join-Path $root 'src\test\java\FmlModVersionProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'FmlModVersion probe compile failed' }
+    $fmvP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$fmvDir;$outClasses", 'FmlModVersionProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$fmvDir\stdout.txt" -RedirectStandardError "$fmvDir\stderr.txt"
+    Get-Content "$fmvDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($fmvP.ExitCode -ne 0) { throw 'FmlModVersion probe FAILED (modVersion success path or the no-throw contract broke)' }
+    Write-Host 'FmlModVersion probe OK' -ForegroundColor Green
+
     # README drift probe: the READMEs quote the exact log lines users look for.
     $rmDir = Join-Path $OutDir 'readme-probe'
     New-Item -ItemType Directory -Force -Path $rmDir | Out-Null

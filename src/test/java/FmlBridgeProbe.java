@@ -67,13 +67,19 @@ public class FmlBridgeProbe {
         } catch (Throwable t) { safe = false; System.out.println("    throw: " + t); }
         check("防御: 非法字段名 / null 字段 返回 null 且不抛异常", safe);
 
-        // ---- 3. modVersion 在 stub 环境下（ModList 不存在）也必须降级 ----
+        // ---- 3. modVersion 在"mod 未安装"时必须降级 ----
+        //     注意：这里的降级前提是"ModList 存在但该 mod 未安装"
+        //     （真实 FML 的 getModFileById 就是 fileById.get(id)，未装返回 null）。
+        //     "ModList 完全不存在"这个前提由 FmlModVersionProbe 的负向测试
+        //     覆盖——因为一旦把 ModList 桩加进共享 stub 集，"不存在"这个
+        //     环境在 classpath 上就不再存在了（2026-10-21 实测：加了 ModList
+        //     桩后本条断言 FAIL，探针改用未安装的 mod id）。
         boolean mvSafe = true;
         String ver = null;
         try {
-            ver = FmlBridge.modVersion("watermedia");
+            ver = FmlBridge.modVersion("__mod_not_installed__");
         } catch (Throwable t) { mvSafe = false; }
-        check("防御: modVersion 无 ModList 时返回 null 且不抛异常", mvSafe && ver == null);
+        check("防御: modVersion 对未安装的 mod 返回 null 且不抛异常", mvSafe && ver == null);
 
         // ---- 4. 形状不符：stub-fml（常量存在但无 get()）必须降级为 null ----
         //        这条走的是另一个候选根包名 net.minecraftforge.fml.loading.FMLPaths

@@ -74,6 +74,31 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖
+  "ModList 不存在"时的降级；而成功路径（找到 ModList → 调
+  `getModFileById` → 调 `versionString`）**零覆盖**。这条路径坏了，
+  `EnvironmentDiagnostics` 会把**已安装的 watermedia 报成"未安装"**——
+  诊断输出直接撒谎，用户照着日志排查会走错方向
+  - 真实 FML 形状已用 `javap` 实证：Forge 1.20.1 与 NeoForge 1.21.1 的
+    `ModList` 都是**具体类**，`getModFileById` 声明在类上、对未安装的 mod
+    返回 `null`（字节码就是 `fileById.get(id)` + checkcast，**不抛异常**）；
+    `FMLPaths` 两端都是 **enum**，`GAMEDIR` 是枚举常量，路径要靠实例方法
+    `get()` 取——`FmlBridge.fmlDir` 的三步链路**与真实 FML 一致**
+  - 新增探针 `src/test/java/FmlModVersionProbe.java`（9 断言）+
+    独立桩目录 `src/test/stubs-fmlmodlist/`（ModList / IModFileInfo /
+    IModInfo / IModFile / IConfigurable）
+  - 新增负向测试 `src/test/negative/neg-fmlmodver.ps1`（把版本查询替换成
+    返回 modId → 探针 6 通过 / 3 失败）
+  - **探针发现并修正了一个错误的既有断言**：`FmlBridgeProbe` 原先断言
+    "ModList 不存在时 modVersion 返回 null"——加了 ModList 桩后该环境在
+    classpath 上**不再存在**，断言必然失败。改为断言"mod 未安装时返回
+    null"（真实 FML 语义），把"ModList 完全不存在"留给独立的
+    `FmlBridgeProbe` classpath 保留
+  - **实测澄清（推翻了一开始的判断）**：`Class.getMethod()` 会搜索类、
+    父类**以及实现的接口**上的 public 方法——即使实现类是**包私有**的，
+    `getMethod("versionString")` 依然能命中。所以 `FmlBridge.call()` 的
+    类查找路径就够用，其 `getInterfaces()` 接口回退是**冗余保险**，
+    不是本场景的必需路径。探针把这条实测事实钉成断言
 - **参数数组里的 null 元素会让加固逻辑抛 NPE**——`JarToolMixin` 的改写循环里  `switch (arg)` 对 null 元素抛
   `NullPointerException: Cannot invoke "String.hashCode()"`；
   `isValue(...)` 里的 `s.startsWith("-")` 同样会对 null 抛

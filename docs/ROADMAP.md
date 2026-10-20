@@ -49,7 +49,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 - ✅ **Every production class has a behaviour probe that links it** (9/9):
   `BiliFixMod`, `CrashSentinel`, `EnvironmentDiagnostics`, `MixinTargetGuard`,
   `BiliFixConfig`, `JarToolMixin`, `FmlBridge`
-- ✅ **All three build scripts run the full suite** - Regression (137) plus eleven
+- ✅ **All three build scripts run the full suite** - Regression (137) plus twelve
   behaviour probes that link the production classes: `ConcurrentRecordProbe`
   (event cap under 32-thread load), `FmlBridgeProbe` (FML reflection chain
   against stub classes under the real package names), `ReadmeLogSampleProbe`
@@ -68,8 +68,10 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   vout=original - the file is the only thing that survives a native
   crash) and `UnknownConfigKeyProbe` (a mistyped config key must be
   visible - the config used to load "successfully" while the setting
-  was silently dropped, with nothing in the log pointing at the cause).
-  Previously only
+  was silently dropped, with nothing in the log pointing at the cause)
+  and `NullElementProbe` (a null entry in the argument array must not
+  make the hardening logic throw - the mixin is supposed to be the one
+  thing that cannot break playback). Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
   concurrency (event list exceeds the cap), FML bridge (missing `get()`),
@@ -79,7 +81,8 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   guard (overload / missing-target detection removed), startup log
   (raw config fields printed again), forensics vout
   (raw voutValue() written to the diagnostics file again), unknown
-  config key (the warning removed again)
+  config key (the warning removed again), null element
+  (both null guards removed again)
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)

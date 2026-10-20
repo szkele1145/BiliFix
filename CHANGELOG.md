@@ -74,6 +74,22 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **参数数组里的 null 元素会让加固逻辑抛 NPE**——`JarToolMixin` 的改写循环里
+  `switch (arg)` 对 null 元素抛
+  `NullPointerException: Cannot invoke "String.hashCode()"`；
+  `isValue(...)` 里的 `s.startsWith("-")` 同样会对 null 抛
+  `NullPointerException: Cannot invoke "String.startsWith(String)"`
+  - 实测（修复前）：参数数组含一个 null 元素 → 改写方法直接抛 NPE
+  - **为什么重要**：本 mixin 是"绝对安全的加固点"，一个 NPE 从这里冒进
+    watermedia 的 `PlayerAPI.start()` 会让**媒体播放直接失败**——
+    加固点反而成了故障源。真实的 `videolan/arguments.json` 经 Gson 解析
+    不会有 null 元素，但 `JarTool.readArray` 是**通用**方法，watermedia
+    将来用它读别的 JSON，其值完全可以含 null
+  - 修复：null 元素**丢弃**（它不可能是有效的 VLC 参数；若它落在某个选项的
+    值位置，保留它会让该选项读到 null 值）；`isValue(null)` 返回 false
+    而不是抛异常
+  - 探针 `src/test/java/NullElementProbe.java`（15 断言）；
+    负向测试 `out/neg-nullelem.ps1`（还原两处防御后 1 通过 / 14 失败）
 - **写错的配置键被静默忽略**——`parse()` 会把配置里的**所有**键放进 map，
   而 `load()` 只读 `hwDecoder` / `vout` / `verbose` 三个，其余**无声丢弃**：
   日志只打印一句"已加载配置"，用户以为自己改的配置生效了

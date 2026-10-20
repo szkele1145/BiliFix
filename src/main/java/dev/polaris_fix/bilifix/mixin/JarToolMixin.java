@@ -53,6 +53,19 @@ public class JarToolMixin {
 
         for (int i = 0; i < original.length; i++) {
             String arg = original[i];
+            // null 元素防御：switch (arg) 与 arg.startsWith(...) 都会对 null 抛 NPE
+            // （String 的 hashCode 被调用）。真实 arguments.json 里不会有 null（Gson
+            // 不产出 null 元素），但 readArray 是**通用**方法——watermedia 将来用它
+            // 读别的 JSON，其值完全可以含 null。
+            //
+            // 后果不可接受：本 mixin 是"绝对安全的加固点"，一个 NPE 从这里冒进
+            // watermedia 的 PlayerAPI.start() 会让**媒体播放直接失败**——加固点
+            // 反而成了故障源。
+            //
+            // null 元素**丢弃**而不是保留：它不可能是有效的 VLC 参数，保留下去
+            // 等于把坏数据交给 libVLC。而且它若正好落在某个选项的**值位置**，
+            // 保留它会让那个选项读到 null 值——丢弃更接近真实语义。
+            if (arg == null) continue;
             switch (arg) {
                 case "--avcodec-hw" -> {
                     sawHw = true;
@@ -116,9 +129,14 @@ public class JarToolMixin {
         cir.setReturnValue(fixed.toArray(new String[0]));
     }
 
-    /** VLC 参数值不会以 - 开头（长选项 -- 与短选项 - 都排除） */
+    /**
+     * VLC 参数值不会以 - 开头（长选项 -- 与短选项 - 都排除）。
+     *
+     * <p>null 视为"不是值"：参数表里出现 null 元素时不能因它抛 NPE
+     * （见循环里的 null 防御注释）。返回 false 时调用方会原样保留该元素。</p>
+     */
     private static boolean isValue(String s) {
-        return !s.startsWith("-");
+        return s != null && !s.startsWith("-");
     }
 
     /** 若 args[i+1] 是值（不以 - 开头），返回 i+1 跳过它；否则返回 i。用于丢弃被替换掉的旧值。 */

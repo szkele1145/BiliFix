@@ -50,6 +50,7 @@ src/test/java/MixinTargetGuardProbe.java # links production classes: the silent-
 src/test/java/StartupLogTruthProbe.java  # links production classes: the startup line must show the effective value
 src/test/java/ForensicsVoutProbe.java    # links production classes: the diagnostics file must not say vout=null
 src/test/java/UnknownConfigKeyProbe.java  # links production classes: a mistyped config key must be visible
+src/test/java/NullElementProbe.java       # links production classes: a null argument entry must not crash the mixin
 src/test/stubs/slf4j/          # a capturing SLF4J provider, so log output can be asserted on
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
@@ -67,7 +68,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe`, `UnknownConfigKeyProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe`, `UnknownConfigKeyProbe`, `NullElementProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -133,6 +134,21 @@ link the real classes and exercise them:
   and the probe tests nothing), and the SPI registration file must have
   no BOM (ServiceLoader does not strip one, so the provider would never
   load and every assertion would see empty logs).
+- `NullElementProbe` - `JarTool.readArray` is a **general** method, not a
+  one-off for `videolan/arguments.json`: whatever watermedia reads with it
+  can contain a `null` entry. The rewriting loop used to do `switch (arg)`
+  on it, which throws
+  `NullPointerException: Cannot invoke "String.hashCode()"`; `isValue(...)`
+  threw the same way on `s.startsWith("-")`. The consequence is not a
+  cosmetic issue - this mixin is the one place that must never break
+  playback, and an NPE escaping into watermedia's `PlayerAPI.start()`
+  **fails the media playback outright**. The probe asserts that a `null`
+  entry is dropped instead, that the safe values still get applied next to
+  it, and that `isValue(null)` answers `false` rather than throwing.
+  The probe catches the exception itself instead of letting it escape: a
+  probe that dies with a stack trace only yields "exit 1", while a probe
+  that records the failure yields the actual NPE and the failing
+  assertion.
 - `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
   a real `CallbackInfoReturnable`. This is the core of the fix, and until this
   probe existed **nothing ever executed it**: the mirror cannot catch a bug in

@@ -367,5 +367,19 @@ try {
     Get-Content "$ukDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($ukP.ExitCode -ne 0) { throw 'Unknown config key probe FAILED (a mistyped config key is silently ignored)' }
     Write-Host 'Unknown config key probe OK' -ForegroundColor Green
+
+    # Null element probe: a null entry in the argument array must not make the
+    # hardening logic throw. JarTool.readArray is a GENERAL method - watermedia
+    # may read other JSON with it, and a null entry would blow up switch (arg).
+    $neDir = Join-Path $OutDir 'nullelem-probe'
+    New-Item -ItemType Directory -Force -Path $neDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$outClasses;$mixinForAr;$slf4jForGpu" -d $neDir (Join-Path $root 'src\test\java\NullElementProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Null element probe compile failed' }
+    $neP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$neDir;$outClasses;$mixinForAr;$slf4jForGpu", 'NullElementProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$neDir\stdout.txt" -RedirectStandardError "$neDir\stderr.txt"
+    Get-Content "$neDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($neP.ExitCode -ne 0) { throw 'Null element probe FAILED (a null argument entry crashes the hardening logic)' }
+    Write-Host 'Null element probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

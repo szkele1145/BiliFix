@@ -270,5 +270,18 @@ try {
     Get-Content "$gdDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($gdP.ExitCode -ne 0) { throw 'Mixin target guard probe FAILED (the guard does not detect the silent skip)' }
     Write-Host 'Mixin target guard probe OK' -ForegroundColor Green
+
+    # Startup log truth probe: the startup line must show the value that is
+    # actually in effect, not the raw string the user typed.
+    $slDir = Join-Path $OutDir 'startuplog-probe'
+    New-Item -ItemType Directory -Force -Path $slDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$(Join-Path $OutDir 'classes');$slf4jForGpu" -d $slDir (Join-Path $root 'src\test\java\StartupLogTruthProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Startup log truth probe compile failed' }
+    $slP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$slDir;$(Join-Path $OutDir 'classes');$slf4jForGpu", 'StartupLogTruthProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$slDir\stdout.txt" -RedirectStandardError "$slDir\stderr.txt"
+    Get-Content "$slDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($slP.ExitCode -ne 0) { throw 'Startup log truth probe FAILED (the startup line does not show the effective value)' }
+    Write-Host 'Startup log truth probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

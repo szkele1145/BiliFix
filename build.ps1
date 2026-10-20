@@ -240,6 +240,22 @@ if (Test-Path "$root\src\test\java\MixinTargetGuardProbe.java") {
     Write-Host "Mixin target guard probe OK" -ForegroundColor Green
 }
 
+# Startup log truth probe (v1.4.8). The startup line is the first thing
+# anyone reads when investigating a crash, so it must show the value that
+# is actually in effect - not the raw string the user typed.
+if (Test-Path "$root\src\test\java\StartupLogTruthProbe.java") {
+    $slOut = "$OutDir\startuplog-probe"
+    New-Item -ItemType Directory -Force -Path $slOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $slOut "$root\src\test\java\StartupLogTruthProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Startup log truth probe compile failed" }
+    $slP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$slOut;$OutDir\classes;$slf4jJar", 'StartupLogTruthProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$slOut\stdout.txt" -RedirectStandardError "$slOut\stderr.txt"
+    Get-Content "$slOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($slP.ExitCode -ne 0) { throw "Startup log truth probe FAILED (the startup line does not show the effective value)" }
+    Write-Host "Startup log truth probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

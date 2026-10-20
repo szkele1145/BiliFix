@@ -54,12 +54,69 @@ public class BiliFixMod {
      * @param gameDir   游戏目录（null = 不写取证文件，退化为无取证模式）
      * @param configDir 配置目录（null = 由 configPath() 走 FML 兜底）
      */
+    /**
+     * 实际生效的策略值（已归一化），用于启动行与诊断输出。
+     *
+     * <p><b>为什么要归一化后再显示</b>：真正写进 VLC 参数的是
+     * {@code hwDecoderValue()} / {@code voutValue()}，而不是配置文件里的原始字符串。
+     * 两者在多处不同：{@code disable}/{@code off} → {@code none}、
+     * {@code auto}/{@code any} → {@code any}、未知值（如 {@code gpu}）→ {@code none}
+     * （并另有一条警告）、{@code vout=original}/{@code keep} → 保留原值、
+     * 大小写与首尾空白被标准化。</p>
+     *
+     * <p>若显示原始值，用户写 {@code hwDecoder="gpu"} 会看到 {@code hw=gpu}
+     * 而实际已回退到 {@code none}（软解），排查方向被直接带偏——而启动行正是
+     * 崩溃排查时读的第一行。实测：9 个取值组合里 5 个显示值与生效值不符。</p>
+     *
+     * @return {@code [hw, vout]}；vout 为 {@code "original"} 表示"保留原值"
+     */
+    public static String[] effectiveStrategy() {
+        String effHw = BiliFixConfig.hwDecoderValue();
+        String effVout = BiliFixConfig.voutValue();
+        return new String[]{ effHw, effVout == null ? "original" : effVout };
+    }
+
+    /**
+     * 归一化是否改变了用户写下的值（用于额外打印一行说明）。
+     *
+     * @return true = 配置被归一化过，值得告诉用户
+     */
+    public static boolean strategyWasNormalized() {
+        String effHw = BiliFixConfig.hwDecoderValue();
+        String effVout = BiliFixConfig.voutValue();
+        String rawHw = BiliFixConfig.hwDecoder;
+        String rawVout = BiliFixConfig.vout;
+        String effVoutText = effVout == null ? "original" : effVout;
+        // vout=original / keep 都表示"保留原值"，对用户是同一种语义
+        String rawVoutNorm = rawVout == null ? null
+                : rawVout.toLowerCase().trim().replace("keep", "original");
+        // 语义等价（忽略大小写与 keep/original 之别）→ 不算归一化
+        boolean hwSame = rawHw != null && rawHw.toLowerCase().trim().equals(effHw);
+        boolean voutSame = rawVoutNorm != null && rawVoutNorm.equals(effVoutText);
+        // 显示一致（逐字符）→ 也不算：用户看到的字符串没变
+        boolean hwIdentical = rawHw != null && rawHw.equals(effHw);
+        boolean voutIdentical = rawVout != null && rawVout.equals(effVoutText);
+        // 只要"用户写的"与"用户看到的"不完全一致，就值得说明一句。
+        // 例：vout=ORIGINAL → 启动行显示 original（大小写变了）；
+        //     vout=keep    → 启动行显示 original（语义别名变了）。
+        return !(hwSame && voutSame) || !(hwIdentical && voutIdentical);
+    }
+
     public static void init(Path gameDir, Path configDir) {
         if (configDir != null) BiliFixConfig.setConfigDir(configDir);
         if (gameDir != null) CrashSentinel.setGameDir(gameDir);
         BiliFixConfig.load();
+        // 启动行必须打印**实际生效**的归一化值，而不是配置文件里的原始字符串。
+        // 见 effectiveStrategy() 的 javadoc。
+        String[] strategy = effectiveStrategy();
         LOGGER.info("[BiliFix] v{} 已加载：watermedia VLC 硬解崩溃修复（策略: hw={}, vout={}）",
-                VERSION, BiliFixConfig.hwDecoder, BiliFixConfig.vout);
+                VERSION, strategy[0], strategy[1]);
+        // 显示值与配置原值不同时明确说明，避免用户以为配置没生效
+        if (strategyWasNormalized()) {
+            LOGGER.info("[BiliFix] 配置归一化：hwDecoder '{}' → {}, vout '{}' → {}",
+                    BiliFixConfig.hwDecoder, strategy[0],
+                    BiliFixConfig.vout, strategy[1]);
+        }
         EnvironmentDiagnostics.run(LOGGER);
         // Mixin 注入目标自检：未来 watermedia 改签名/加重载时，Mixin 会静默跳过注入，
         // 修复无声失效、崩溃回归却无迹可寻。这里把它变成启动时的一条明确警告。

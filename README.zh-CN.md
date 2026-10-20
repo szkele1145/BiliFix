@@ -107,6 +107,7 @@ verbose = false
 [BiliFix] v1.4.8 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
 [BiliFix] ==== BiliFix 环境诊断 ====
 [BiliFix] watermedia: 已安装 ✓（BiliFix 正在守护）
+[BiliFix] GPU: AMD Radeon RX6500 XT / GameViewer Virtual Display Adapter
 [BiliFix] Mixin 注入目标自检通过: org.watermedia.core.tools.JarTool.readArray(String) 唯一匹配
 [BiliFix] 功能自检通过: --avcodec-hw=none , --vout=gl,any —— 注入已生效（端到端验证）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
@@ -115,6 +116,8 @@ verbose = false
 > 括号里的参数数量由 watermedia 决定，会随其版本变化（2.1.36/2.1.37 实测均为 18 项，
 > `javap` 已确认两版 `JarTool.readArray(String)` 签名一致）；
 > 关键是两个加固项已替换、且总项数不变（没有丢参数）。
+> `GPU:` 行显示的是本机全部显示适配器（多显卡会并列，用 ` / ` 分隔）；非 Windows
+> 系统不显示这行。
 
 ### 怎么看懂这几行
 

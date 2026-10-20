@@ -110,6 +110,8 @@ After launching, the log should contain:
 
 ```
 [BiliFix] v1.4.8 已加载：watermedia VLC 硬解崩溃修复（策略: hw=none, vout=gl,any）
+[BiliFix] ==== BiliFix 环境诊断 ====
+[BiliFix] GPU: AMD Radeon RX6500 XT / GameViewer Virtual Display Adapter
 [BiliFix] Mixin 注入目标自检通过: org.watermedia.core.tools.JarTool.readArray(String) 唯一匹配
 [BiliFix] 功能自检通过: --avcodec-hw=none , --vout=gl,any —— 注入已生效（端到端验证）
 [BiliFix] VLC 参数已加固: --avcodec-hw=none , --vout=gl,any (原 18 项 → 新 18 项)
@@ -119,6 +121,8 @@ After launching, the log should contain:
 > (18 with 2.1.36/2.1.37 — `javap` confirms `JarTool.readArray(String)` has the
 > same signature in both). What matters is that both hardening entries were
 > replaced and the total count is unchanged — no argument was dropped.
+> The `GPU:` line lists every display adapter on the machine (joined with ` / `
+> when there is more than one); it is absent on non-Windows systems.
 
 ### Reading these lines
 

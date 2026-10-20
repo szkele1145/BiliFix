@@ -149,7 +149,14 @@ Copy-Item (Join-Path $outClasses 'dev') $pkg -Recurse -Force
 $mixinsTxt = [System.IO.File]::ReadAllText((Join-Path $root 'src\main\resources\bilifix.mixins.json'),
                                            [System.Text.Encoding]::UTF8)
 if ($mixinsTxt -notmatch '"compatibilityLevel"\s*:\s*"JAVA_21"') {
-    Write-Warning 'bilifix.mixins.json: no "compatibilityLevel": "JAVA_21" found - source may have changed'
+    # HARD FAIL, not a warning: the downgrade below is a string replace, so if the
+    # source no longer says JAVA_21 the replace is a no-op and the jar ships with
+    # whatever compatibilityLevel the source has. Mixin only rejects an unknown
+    # level at BOOTSTRAP time ("No enum constant ...CompatibilityLevel.JAVA_xx"),
+    # i.e. inside the game - the worst possible moment to find out. The
+    # post-replace check below cannot catch this case (there is no JAVA_21 left
+    # to find), so the source shape has to be asserted here.
+    throw 'bilifix.mixins.json: expected "compatibilityLevel": "JAVA_21" in the source (the 1.20.1 variants downgrade it to JAVA_17) - source has changed'
 }
 $mixinsTxt = $mixinsTxt -replace '"compatibilityLevel"\s*:\s*"JAVA_21"', '"compatibilityLevel": "JAVA_17"'
 if ($mixinsTxt -match 'JAVA_21') { throw 'mixins.json still contains JAVA_21 after downgrade' }

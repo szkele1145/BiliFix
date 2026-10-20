@@ -289,5 +289,18 @@ try {
     Get-Content "$fsDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($fsP.ExitCode -ne 0) { throw 'Forensics suppression probe FAILED (the suppression leaks across threads)' }
     Write-Host 'Forensics suppression probe OK' -ForegroundColor Green
+
+    # Config parse probe: a UTF-8 BOM must not make the parser drop the first
+    # key, otherwise the user's hwDecoder setting is silently ignored.
+    $cfgDir = Join-Path $OutDir 'cfgparse-probe'
+    New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$outClasses;$slf4jForGpu" -d $cfgDir (Join-Path $root 'src\test\java\ConfigParseProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Config parse probe compile failed' }
+    $cfgP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$cfgDir;$outClasses;$slf4jForGpu", 'ConfigParseProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$cfgDir\stdout.txt" -RedirectStandardError "$cfgDir\stderr.txt"
+    Get-Content "$cfgDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($cfgP.ExitCode -ne 0) { throw 'Config parse probe FAILED (the parser does not handle a UTF-8 BOM)' }
+    Write-Host 'Config parse probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

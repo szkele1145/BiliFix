@@ -124,8 +124,18 @@ public final class BiliFixConfig {
 
     static Map<String, String> parse(Path path) throws IOException {
         Map<String, String> kv = new LinkedHashMap<>();
+        boolean first = true;
         for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
             String s = line.trim();
+            // UTF-8 BOM（U+FEFF）剥离：Windows 上记事本等编辑器默认以 UTF-8+BOM
+            // 保存，而 Files.readAllLines 不会去掉它 → 首个 key 变成
+            // "\uFEFFhwDecoder"，containsKey("hwDecoder") 为 false，用户的配置
+            // **被静默忽略**（且只有第一个键受影响，vout/verbose 照常生效，
+            // 更难察觉）。实测：带 BOM → containsKey=false，不带 → true。
+            if (first) {
+                first = false;
+                if (!s.isEmpty() && s.charAt(0) == '\uFEFF') s = s.substring(1).trim();
+            }
             if (s.isEmpty() || s.startsWith("#")) continue;
             int eq = s.indexOf('=');
             if (eq <= 0) continue;

@@ -123,6 +123,26 @@ public class Regression {
         check("配置: 未闭合引号", "abc".equals(stripValue("\"abc")));
         check("配置: 空值", "".equals(stripValue("")));
 
+        // ============ 9.1. UTF-8 BOM 剥离（v1.4.8） ============
+        // Files.readAllLines(path, UTF_8) 不剥离 BOM。Windows 记事本等默认以
+        // "UTF-8 带 BOM" 保存配置 → 首个 key 变成 "\uFEFFhwDecoder" →
+        // containsKey("hwDecoder") 为 false → 用户的配置被静默忽略。
+        // 只有第一个键受影响（vout/verbose 照常生效），更难察觉。
+        try {
+            Path bomCfg = Files.createTempFile("bilifix-bom", ".toml");
+            Files.write(bomCfg, ("\uFEFFhwDecoder = \"any\"\nvout = \"original\"\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            Map<String,String> bomKv = parse(bomCfg);
+            check("配置: 带 BOM 时 hwDecoder 仍可解析", bomKv.containsKey("hwDecoder"));
+            check("配置: 带 BOM 时 hwDecoder 值正确", "any".equals(bomKv.get("hwDecoder")));
+            check("配置: 带 BOM 时 vout 不受影响", "original".equals(bomKv.get("vout")));
+            check("配置: 解析出的 key 不含 BOM 字符",
+                    bomKv.keySet().stream().noneMatch(k -> k.contains("\uFEFF")));
+            Files.deleteIfExists(bomCfg);
+        } catch (Exception e) {
+            skip("配置: BOM 行为断言异常 - " + e);
+        }
+
         // ============ 9.5. mixin 资源守卫与边界（与 JarToolMixin 行为同步） ============
         String[] plain = {"--no-quiet", "--http-reconnect"};
         List<String> g1 = fixArgs("other.json", plain, "none", "gl,any");
@@ -409,6 +429,10 @@ public class Regression {
                 String src = Files.readString(cfgSrc, StandardCharsets.UTF_8);
                 check("配置: writeDefault 会创建父目录（createDirectories）",
                         src.contains("Files.createDirectories(parent)"));
+                // v1.4.8：生产 parse() 必须剥离 UTF-8 BOM，否则用户用 Windows
+                // 记事本保存的配置会丢掉第一个键（hwDecoder 被静默忽略）。
+                check("配置: 生产 parse 剥离 UTF-8 BOM（\\uFEFF）",
+                        src.contains("\\uFEFF"));
             } else {
                 skip("配置: BiliFixConfig.java 缺失，跳过源码断言");
             }
@@ -962,8 +986,16 @@ public class Regression {
     // ===== 与 BiliFixConfig 相同的辅助（v1.2.1+：走 stripValue，与生产代码同步） =====
     static Map<String,String> parse(Path path) throws Exception {
         Map<String,String> kv = new LinkedHashMap<>();
+        boolean first = true;
         for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
             String s = line.trim();
+            // v1.4.8：与生产同步 —— 剥离 UTF-8 BOM。Files.readAllLines 不去 BOM，
+            // 带 BOM 的配置首个 key 会变成 "\uFEFFhwDecoder" → containsKey 为 false
+            // → 用户的 hwDecoder 被静默忽略（只有第一个键受影响，更难察觉）。
+            if (first) {
+                first = false;
+                if (!s.isEmpty() && s.charAt(0) == '\uFEFF') s = s.substring(1).trim();
+            }
             if (s.isEmpty() || s.startsWith("#")) continue;
             int eq = s.indexOf('=');
             if (eq <= 0) continue;

@@ -207,6 +207,22 @@ if (Test-Path "$root\src\test\java\ForensicsSuppressionProbe.java") {
     Write-Host "Forensics suppression probe OK" -ForegroundColor Green
 }
 
+# Config parse probe (v1.4.8). A UTF-8 BOM in the config file must not make
+# the parser drop the first key - Windows editors save with a BOM by default,
+# which would silently ignore the user's hwDecoder setting.
+if (Test-Path "$root\src\test\java\ConfigParseProbe.java") {
+    $cpOut = "$OutDir\cfgparse-probe"
+    New-Item -ItemType Directory -Force -Path $cpOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $cpOut "$root\src\test\java\ConfigParseProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Config parse probe compile failed" }
+    $cpP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$cpOut;$OutDir\classes;$slf4jJar", 'ConfigParseProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$cpOut\stdout.txt" -RedirectStandardError "$cpOut\stderr.txt"
+    Get-Content "$cpOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($cpP.ExitCode -ne 0) { throw "Config parse probe FAILED (the parser does not handle a UTF-8 BOM)" }
+    Write-Host "Config parse probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

@@ -190,3 +190,28 @@ try {
 if ($fail -gt 0) { throw "fabric jar integrity check FAILED ($fail of $total)" }
 Write-Host "Jar integrity: $total/$total entries OK" -ForegroundColor Green
 Write-Host "Fabric jar: $jarOut ($((Get-Item $jarOut).Length) bytes, $total entries)" -ForegroundColor Green
+
+# ---- tests (v1.4.8) ----
+# Mirrors build.ps1 / build-forge.ps1: previously only build.ps1 ran tests, so
+# running ONLY build-fabric.ps1 gave zero coverage. Both steps run after
+# packaging so the §9.6b jar structure assertions cover this variant's output.
+Push-Location $root
+try {
+    $testDir = Join-Path $OutDir 'test'
+    New-Item -ItemType Directory -Force -Path $testDir | Out-Null
+    & $javac -encoding UTF-8 -d $testDir (Join-Path $root 'src\test\java\Regression.java')
+    if ($LASTEXITCODE -ne 0) { throw 'regression compile failed' }
+    $javaExe = $javac -replace 'javac\.exe$', 'java.exe'
+    & $javaExe -cp $testDir Regression
+    if ($LASTEXITCODE -ne 0) { throw 'regression tests failed' }
+    Write-Host 'Regression tests OK' -ForegroundColor Green
+
+    $probeDir = Join-Path $OutDir 'concurrency-probe'
+    New-Item -ItemType Directory -Force -Path $probeDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp $outClasses -d $probeDir (Join-Path $root 'src\test\java\ConcurrentRecordProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'concurrency probe compile failed' }
+    & $javaExe -cp "$probeDir;$outClasses" ConcurrentRecordProbe
+    if ($LASTEXITCODE -ne 0) { throw 'concurrency probe FAILED (event cap not held under load)' }
+    Write-Host 'Concurrency probe OK' -ForegroundColor Green
+}
+finally { Pop-Location }

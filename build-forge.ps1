@@ -1,4 +1,4 @@
-﻿# Forge 1.20.1 variant builder.
+# Forge 1.20.1 variant builder.
 # Produces BiliFix-<version>-mc1.20.1-forge.jar from the SAME sources with 3 import
 # substitutions (net.neoforged.* -> net.minecraftforge.*) + Forge-flavored mods.toml.
 # Layout: src/main/java is shared; this script stages patched copies into build/forge.
@@ -144,3 +144,29 @@ $total = $zc.Entries.Count
 $zc.Dispose()
 if ($fail -gt 0) { throw "forge jar integrity check FAILED ($fail of $total)" }
 Write-Host "Forge jar: $OutDir\$jarName ($((Get-Item "$OutDir\$jarName").Length) bytes, $total/$total entries OK)" -ForegroundColor Green
+
+# ---- tests (v1.4.8) ----
+# Previously only build.ps1 ran tests, so running ONLY build-forge.ps1 gave zero
+# coverage: a broken CrashSentinel/BiliFixConfig change would sail straight into
+# the 1.20.1 Forge jar. Same two steps as build.ps1, run after packaging so the
+# §9.6b jar structure assertions cover this variant's output too.
+Push-Location $root
+try {
+    $testDir = Join-Path $OutDir 'test'
+    New-Item -ItemType Directory -Force -Path $testDir | Out-Null
+    & $javac -encoding UTF-8 -d $testDir (Join-Path $root 'src\test\java\Regression.java')
+    if ($LASTEXITCODE -ne 0) { throw 'regression compile failed' }
+    $javaExe = $javac -replace 'javac\.exe$', 'java.exe'
+    & $javaExe -cp $testDir Regression
+    if ($LASTEXITCODE -ne 0) { throw 'regression tests failed' }
+    Write-Host 'Regression tests OK' -ForegroundColor Green
+
+    $probeDir = Join-Path $OutDir 'concurrency-probe'
+    New-Item -ItemType Directory -Force -Path $probeDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp (Join-Path $OutDir 'classes') -d $probeDir (Join-Path $root 'src\test\java\ConcurrentRecordProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'concurrency probe compile failed' }
+    & $javaExe -cp "$probeDir;$(Join-Path $OutDir 'classes')" ConcurrentRecordProbe
+    if ($LASTEXITCODE -ne 0) { throw 'concurrency probe FAILED (event cap not held under load)' }
+    Write-Host 'Concurrency probe OK' -ForegroundColor Green
+}
+finally { Pop-Location }

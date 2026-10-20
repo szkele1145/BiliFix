@@ -283,5 +283,18 @@ try {
     Get-Content "$slDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($slP.ExitCode -ne 0) { throw 'Startup log truth probe FAILED (the startup line does not show the effective value)' }
     Write-Host 'Startup log truth probe OK' -ForegroundColor Green
+
+    # Forensics vout probe: the diagnostics file must not say "vout=null"
+    # when the user deliberately set vout=original.
+    $fvDir = Join-Path $OutDir 'forensicsvout-probe'
+    New-Item -ItemType Directory -Force -Path $fvDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$(Join-Path $OutDir 'classes');$slf4jForGpu" -d $fvDir (Join-Path $root 'src\test\java\ForensicsVoutProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Forensics vout probe compile failed' }
+    $fvP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$fvDir;$(Join-Path $OutDir 'classes');$slf4jForGpu", 'ForensicsVoutProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$fvDir\stdout.txt" -RedirectStandardError "$fvDir\stderr.txt"
+    Get-Content "$fvDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($fvP.ExitCode -ne 0) { throw 'Forensics vout probe FAILED (the diagnostics file misreports the vout strategy)' }
+    Write-Host 'Forensics vout probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

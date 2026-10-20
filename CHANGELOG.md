@@ -74,6 +74,17 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **取证文件里的 `vout=null` 会让用户以为配置坏了**——`writeDiagnostic`（写
+  `bilifix-diagnostic.txt`）与 `markSessionStart`（写 `bilifix-session.lock`）
+  直接写 `voutValue()` 的返回值。用户显式配置 `vout = "original"`（或 `keep`）时，
+  它返回 `null`——含义是"**保留 watermedia 的原值**"，但文件里就成了 `vout=null`，
+  读起来像"配置丢了/坏了"，而实际配置完全正确
+  - 实测（修复前）：`vout=original` / `keep` / `ORIGINAL` 三种写法都写成
+    `strategy: hw=none, vout=null`
+  - **为什么重要**：诊断文件是原生崩溃后 Java 侧**唯一**留下的东西，用户会照它排查
+  - 修复：新增 `strategyVout()`，null 映射为用户能读懂的 `original`
+  - 探针 `src/test/java/ForensicsVoutProbe.java`（12 断言）；
+    负向测试 `out/neg-forensicsvout.ps1`（还原后 2 通过 / 10 失败）
 - **启动行显示的值与实际生效的值不一致**——`BiliFixMod.init()` 打印的是配置里的
   **原始字符串**，而真正写进 VLC 参数的是**归一化后**的值
   （`hwDecoderValue()` / `voutValue()`）。两者在多处不同：

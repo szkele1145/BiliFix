@@ -211,7 +211,7 @@ public final class CrashSentinel {
                     + "\nversion=" + BiliFixMod.VERSION
                     + "\nstarted=" + Instant.now()
                     + "\nstrategy: hw=" + BiliFixConfig.hwDecoderValue()
-                    + ", vout=" + BiliFixConfig.voutValue() + "\n";
+                    + ", vout=" + strategyVout() + "\n";
             Files.write(gameDir.resolve(SESSION_FILE),
                     content.getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
@@ -258,7 +258,7 @@ public final class CrashSentinel {
             sb.append("harden count: ").append(HARDEN_COUNT.get()).append('\n');
             sb.append("media touched: ").append(mediaTouched ? "yes" : "no").append('\n');
             sb.append("strategy: hw=").append(BiliFixConfig.hwDecoderValue())
-              .append(", vout=").append(BiliFixConfig.voutValue()).append('\n');
+              .append(", vout=").append(strategyVout()).append('\n');
             sb.append("events (").append(EVENTS.size()).append(" recorded):\n");
             for (String e : EVENTS) sb.append("  ").append(e).append('\n');
             sb.append("-- end --\n");
@@ -283,6 +283,23 @@ public final class CrashSentinel {
         Path injected = injectedGameDir;
         if (injected != null) return injected;
         return FmlBridge.fmlDir("GAMEDIR");
+    }
+
+    /**
+     * 诊断文件里显示的 vout 策略。
+     *
+     * <p><b>为什么不能直接写 {@code voutValue()}</b>：用户显式配置
+     * {@code vout = "original"}（或 {@code keep}）时，{@code voutValue()} 返回
+     * {@code null}——它的含义是"不替换、保留 watermedia 的原值"，<b>不是</b>
+     * "没有配置"。直接写进诊断文件就成了 {@code vout=null}，用户看到会以为
+     * 配置丢失或损坏，而实际上这正是他自己要求的设置。</p>
+     *
+     * <p>诊断文件是原生崩溃后 Java 侧**唯一**留下的东西，用户会照它排查，
+     * 所以这里显示用户能读懂的形式：{@code original}。</p>
+     */
+    private static String strategyVout() {
+        String v = BiliFixConfig.voutValue();
+        return v == null ? "original" : v;
     }
 
     /**

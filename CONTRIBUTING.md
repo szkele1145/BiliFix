@@ -48,6 +48,7 @@ src/test/java/ForensicsSuppressionProbe.java  # links production classes: suppre
 src/test/java/ConfigParseProbe.java      # links production classes: a UTF-8 BOM must not drop the first setting
 src/test/java/MixinTargetGuardProbe.java # links production classes: the silent-skip guard, vs real stubs
 src/test/java/StartupLogTruthProbe.java  # links production classes: the startup line must show the effective value
+src/test/java/ForensicsVoutProbe.java    # links production classes: the diagnostics file must not say vout=null
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
@@ -64,7 +65,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -111,6 +112,13 @@ link the real classes and exercise them:
   code**; and that assertion must look at the `effectiveStrategy()` body
   only, because `strategyWasNormalized()` also calls
   `hwDecoderValue()` - searching the whole file hides the break.
+- `ForensicsVoutProbe` - `bilifix-diagnostic.txt` is the only thing that
+  survives a native crash, so what it says has to be readable. A user who
+  deliberately set `vout = "original"` used to find `vout=null` in it:
+  `voutValue()` returns `null` to mean "keep watermedia's own value", but
+  written verbatim that reads as "the setting is gone or broken". The
+  probe asserts the file says `original`, for both the diagnostics file
+  and the session lock.
 - `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
   a real `CallbackInfoReturnable`. This is the core of the fix, and until this
   probe existed **nothing ever executed it**: the mirror cannot catch a bug in

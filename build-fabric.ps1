@@ -302,5 +302,18 @@ try {
     Get-Content "$cfgDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($cfgP.ExitCode -ne 0) { throw 'Config parse probe FAILED (the parser does not handle a UTF-8 BOM)' }
     Write-Host 'Config parse probe OK' -ForegroundColor Green
+
+    # Mixin target guard probe: the guard that turns a silent mixin skip into
+    # a visible warning must be verified against real stub classes.
+    $gdDir = Join-Path $OutDir 'guard-probe'
+    New-Item -ItemType Directory -Force -Path $gdDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$outClasses;$slf4jForGpu" -d $gdDir (Join-Path $root 'src\test\java\MixinTargetGuardProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Mixin target guard probe compile failed' }
+    $gdP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$gdDir;$outClasses;$slf4jForGpu", 'MixinTargetGuardProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$gdDir\stdout.txt" -RedirectStandardError "$gdDir\stderr.txt"
+    Get-Content "$gdDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($gdP.ExitCode -ne 0) { throw 'Mixin target guard probe FAILED (the guard does not detect the silent skip)' }
+    Write-Host 'Mixin target guard probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

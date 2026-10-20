@@ -223,6 +223,23 @@ if (Test-Path "$root\src\test\java\ConfigParseProbe.java") {
     Write-Host "Config parse probe OK" -ForegroundColor Green
 }
 
+# Mixin target guard probe (v1.4.8). The whole fix rides on one optional
+# mixin injection (defaultRequire: 0), so the guard that turns a silent
+# skip into a visible warning must be verified against real stub classes,
+# not just mirrored.
+if (Test-Path "$root\src\test\java\MixinTargetGuardProbe.java") {
+    $gdOut = "$OutDir\guard-probe"
+    New-Item -ItemType Directory -Force -Path $gdOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $gdOut "$root\src\test\java\MixinTargetGuardProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Mixin target guard probe compile failed" }
+    $gdP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$gdOut;$OutDir\classes;$slf4jJar", 'MixinTargetGuardProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$gdOut\stdout.txt" -RedirectStandardError "$gdOut\stderr.txt"
+    Get-Content "$gdOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($gdP.ExitCode -ne 0) { throw "Mixin target guard probe FAILED (the guard does not detect the silent skip)" }
+    Write-Host "Mixin target guard probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

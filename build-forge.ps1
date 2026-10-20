@@ -356,6 +356,22 @@ try {
     Get-Content "$cdDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($cdP.ExitCode -ne 0) { throw 'Config default probe FAILED (the default values have more than one source of truth)' }
     Write-Host 'Config default probe OK' -ForegroundColor Green
+    # Mirror parity probe: the Regression mirror is an INDEPENDENT
+    # re-implementation of the production logic, so when production changes
+    # on purpose the mirror has to be updated BY HAND. When it is not, the
+    # mirror gives the opposite answer from production while every mirror
+    # test still passes - the worst possible state for a safety net.
+    # Three real divergences were measured this way (v1.4.8).
+    $mpDir = Join-Path $OutDir 'mirrorparity-probe'
+    New-Item -ItemType Directory -Force -Path $mpDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$(Join-Path $OutDir 'classes');$slf4jForGpu" -d $mpDir (Join-Path $root 'src\test\java\Regression.java') (Join-Path $root 'src\test\java\MirrorParityProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Mirror parity probe compile failed' }
+    $mpP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$mpDir;$(Join-Path $OutDir 'classes');$slf4jForGpu", 'MirrorParityProbe', 'src/test/java/Regression.java') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$mpDir\stdout.txt" -RedirectStandardError "$mpDir\stderr.txt"
+    Get-Content "$mpDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($mpP.ExitCode -ne 0) { throw 'Mirror parity probe FAILED (the regression mirror disagrees with production)' }
+    Write-Host 'Mirror parity probe OK' -ForegroundColor Green
 
     # Null element probe: a null entry in the argument array must not make the
     # hardening logic throw. JarTool.readArray is a GENERAL method - watermedia

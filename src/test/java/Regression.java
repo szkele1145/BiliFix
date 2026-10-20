@@ -1007,7 +1007,7 @@ public class Regression {
     }
     static String hwValue(String s) {
         if (s == null) return "none";
-        return switch (s.toLowerCase()) {
+        return switch (s.toLowerCase().trim()) {
             case "disable", "none", "off" -> "none";
             case "auto", "any" -> "any";
             case "d3d11va" -> "d3d11va";
@@ -1015,11 +1015,20 @@ public class Regression {
             default -> "none";
         };
     }
+    /**
+     * 镜像实现，必须与生产的 {@code BiliFixConfig.voutValue()} 行为一致。
+     *
+     * <p>v1.4.8 实测分歧（已修）：本镜像原先把空串原样返回，生产已改成回退
+     * 安全默认 {@code gl,any}。镜像是独立实现（不引用生产类），所以生产行为
+     * <b>有意改变</b>时必须手工同步——否则镜像会给出与生产相反的结论，
+     * 这比没有镜像更糟。分歧检测见 {@code MirrorParityProbe}。</p>
+     */
     static Object voutMap(String s) {
         if (s == null) return null;
-        return switch (s.toLowerCase().trim()) {
+        String v = s.toLowerCase().trim();
+        return switch (v) {
             case "original", "keep" -> null;
-            default -> s.toLowerCase().trim();
+            default -> v.isEmpty() ? "gl,any" : v;
         };
     }
 

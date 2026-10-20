@@ -49,7 +49,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 - ✅ **Every production class has a behaviour probe that links it** (9/9):
   `BiliFixMod`, `CrashSentinel`, `EnvironmentDiagnostics`, `MixinTargetGuard`,
   `BiliFixConfig`, `JarToolMixin`, `FmlBridge`
-- ✅ **All three build scripts run the full suite** - Regression (137) plus fourteen
+- ✅ **All three build scripts run the full suite** - Regression (137) plus fifteen
   behaviour probes that link the production classes: `ConcurrentRecordProbe`
   (event cap under 32-thread load), `FmlBridgeProbe` (FML reflection chain
   against stub classes under the real package names), `ReadmeLogSampleProbe`
@@ -78,7 +78,11 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   ONE source of truth - they used to be hard-coded in four places, and a
   drift there means the user's config file says one thing while the
   effective behaviour is another, with the log claiming the config loaded
-  fine). Previously only
+  fine) and `MirrorParityProbe` (the Regression mirror is an INDEPENDENT
+  re-implementation, so it has to be updated BY HAND when production
+  changes on purpose - three real divergences were measured this way, and
+  a stale mirror gives the opposite answer from production while every
+  mirror test still passes). Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
   concurrency (event list exceeds the cap), FML bridge (missing `get()`),
@@ -90,7 +94,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   (raw voutValue() written to the diagnostics file again), unknown
   config key (the warning removed again), null element
   (both null guards removed again), FML mod version
-  (the version lookup replaced by the mod id), config default (the defaults hard-coded again)
+  (the version lookup replaced by the mod id), config default (the defaults hard-coded again), mirror parity (the mirror drifted from production)
 - ✅ **Negative tests are in the repository**. They used to live in `out/`,
   which is git-ignored: the evidence that the probes can actually fail
   existed on one machine only. Now they live in `src/test/negative/` and

@@ -49,7 +49,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 - ✅ **Every production class has a behaviour probe that links it** (9/9):
   `BiliFixMod`, `CrashSentinel`, `EnvironmentDiagnostics`, `MixinTargetGuard`,
   `BiliFixConfig`, `JarToolMixin`, `FmlBridge`
-- ✅ **All three build scripts run the full suite** - Regression (137) plus eight
+- ✅ **All three build scripts run the full suite** - Regression (137) plus nine
   behaviour probes that link the production classes: `ConcurrentRecordProbe`
   (event cap under 32-thread load), `FmlBridgeProbe` (FML reflection chain
   against stub classes under the real package names), `ReadmeLogSampleProbe`
@@ -59,16 +59,19 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   never executed by any test), `ForensicsSuppressionProbe` (the startup
   self-check's suppression must not leak across threads),
   `ConfigParseProbe` (a UTF-8 BOM in the config file must not drop the
-  user's first setting) and `MixinTargetGuardProbe` (the guard that turns a
+  user's first setting), `MixinTargetGuardProbe` (the guard that turns a
   silent mixin skip into a visible warning, checked against real stub
-  classes). Previously only
+  classes) and `StartupLogTruthProbe` (the startup line must show the
+  value that is actually in effect, not the raw string the user typed -
+  5 of 9 value combinations used to disagree). Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
   concurrency (event list exceeds the cap), FML bridge (missing `get()`),
   README (version drift), GPU (reverted to the class-key query), argument
   rewrite (old value kept / `=` form unrewritten), forensics (suppression
   leaks across threads), config parse (BOM-unaware parser), mixin target
-  guard (overload / missing-target detection removed)
+  guard (overload / missing-target detection removed), startup log
+  (raw config fields printed again)
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)

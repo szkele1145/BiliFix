@@ -74,6 +74,26 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **启动行显示的值与实际生效的值不一致**——`BiliFixMod.init()` 打印的是配置里的
+  **原始字符串**，而真正写进 VLC 参数的是**归一化后**的值
+  （`hwDecoderValue()` / `voutValue()`）。两者在多处不同：
+  `disable`/`off` → `none`、`auto`/`AUTO`/`any` → `any`、未知值（如 `gpu`）→ `none`、
+  `vout=original`/`keep` → 保留原值、`vout` 的大小写与空白被标准化。
+  **实测 9 个取值组合里 5 个显示值与生效值不符。**
+  - **为什么重要**：启动行是崩溃排查时读的第一行。用户写 `hwDecoder="gpu"` 时
+    日志说 `hw=gpu` 而实际已回退到 `none`（软解）——会以为硬解还开着、追错方向；
+    `hwDecoder="AUTO"` 更危险：日志说 `hw=AUTO` 而实际是 `any`，
+    即 VLC 自动选硬解——**正是引发崩溃的那一档**
+  - 现在启动行显示**生效值**，且归一化发生时额外说明一行：
+    `[BiliFix] 配置归一化：hwDecoder 'gpu' → none, vout 'ORIGINAL' → original`
+  - `effectiveStrategy()` / `strategyWasNormalized()` 成为日志与探针的**单一真相源**，
+    两者不会再漂移
+  - 探针 `src/test/java/StartupLogTruthProbe.java`（23 断言）遍历 13 个配置组合；
+    负向测试 `out/neg-startuplog.ps1` 证明其有效（还原后 10 通过 / 4 失败）
+  - **踩坑记录**：探针的源码级断言必须**接收源码文件路径作为参数**——
+    否则它读的是工作副本而非被测的那份代码，断言会对坏掉的代码**假 PASS**；
+    且断言必须只看 `effectiveStrategy()` 方法体（`strategyWasNormalized()`
+    里同样调用 `hwDecoderValue()`，搜全文会掩盖破坏）
 - **配置文件里的 UTF-8 BOM 会静默吃掉用户的 `hwDecoder` 设置**——`parse()` 用
   `Files.readAllLines(path, UTF_8)`，该方法**不剥离 BOM**。Windows 上记事本等
   编辑器默认以"UTF-8 带 BOM"保存 → 首个 key 变成 `"\uFEFFhwDecoder"` →

@@ -47,6 +47,7 @@ src/test/java/ArgumentRewriteProbe.java   # links production classes: the harden
 src/test/java/ForensicsSuppressionProbe.java  # links production classes: suppression must not leak across threads
 src/test/java/ConfigParseProbe.java      # links production classes: a UTF-8 BOM must not drop the first setting
 src/test/java/MixinTargetGuardProbe.java # links production classes: the silent-skip guard, vs real stubs
+src/test/java/StartupLogTruthProbe.java  # links production classes: the startup line must show the effective value
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
@@ -63,7 +64,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -99,6 +100,17 @@ link the real classes and exercise them:
   `functionalProbe(Logger)`. All four `Status` values are covered, including
   `WATERMEDIA_ABSENT` - which must log info, not warn, because watermedia
   simply being absent is normal.
+- `StartupLogTruthProbe` - the startup line is the first thing anyone
+  reads when investigating a crash, so it must show the value that is
+  actually in effect, not the raw string the user typed. The probe walks
+  13 configuration combinations (`disable`/`off`/`auto`/`AUTO`/unknown
+  values/`original`/`keep`/mixed case/whitespace) and asserts the
+  effective value each time. Two traps worth knowing: the probe must
+  take the source file path as an argument, otherwise it reads the
+  working copy and its source-level assertion **passes against broken
+  code**; and that assertion must look at the `effectiveStrategy()` body
+  only, because `strategyWasNormalized()` also calls
+  `hwDecoderValue()` - searching the whole file hides the break.
 - `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
   a real `CallbackInfoReturnable`. This is the core of the fix, and until this
   probe existed **nothing ever executed it**: the mirror cannot catch a bug in

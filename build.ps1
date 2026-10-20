@@ -169,6 +169,26 @@ if (Test-Path "$root\src\test\java\GpuDetectProbe.java") {
     Write-Host "GPU probe OK" -ForegroundColor Green
 }
 
+# Argument rewrite probe (v1.4.8). The core of the fix is the argument
+# rewriting in JarToolMixin. Until now nothing actually EXECUTED it:
+# Regression is an independent mirror and the README probe only compares
+# log strings. This probe calls the production method with a real
+# CallbackInfoReturnable and checks the dangerous parameters are gone.
+$mixinJar = "$lib\org\spongepowered\mixin\0.8.5\mixin-0.8.5.jar"
+$slf4jJar = "$lib\org\slf4j\slf4j-api\2.0.7\slf4j-api-2.0.7.jar"
+if ((Test-Path "$root\src\test\java\ArgumentRewriteProbe.java") -and (Test-Path $mixinJar)) {
+    $arOut = "$OutDir\arg-probe"
+    New-Item -ItemType Directory -Force -Path $arOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$mixinJar;$slf4jJar" -d $arOut "$root\src\test\java\ArgumentRewriteProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Argument rewrite probe compile failed" }
+    $arP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$arOut;$OutDir\classes;$mixinJar;$slf4jJar", 'ArgumentRewriteProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$arOut\stdout.txt" -RedirectStandardError "$arOut\stderr.txt"
+    Get-Content "$arOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($arP.ExitCode -ne 0) { throw "Argument rewrite probe FAILED (the hardening logic did not behave as required)" }
+    Write-Host "Argument rewrite probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

@@ -42,7 +42,10 @@ src/test/java/Regression.java # 131 assertions, mirrors production logic 1:1
 src/test/java/ConcurrentRecordProbe.java  # links production classes: event cap under load
 src/test/java/FmlBridgeProbe.java         # links production classes: FML reflection chain
 src/test/java/ReadmeLogSampleProbe.java   # README log samples vs production strings
+src/test/java/GpuDetectProbe.java         # links production classes: GPU detection really works
+src/test/java/ArgumentRewriteProbe.java   # links production classes: the hardening logic itself
 src/test/stubs/               # stub FML classes under the REAL package names
+src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
 build-forge.ps1    # Forge 1.20.1 variant (see docs/cross-loader-research.md)
 build-fabric.ps1   # Fabric 1.20.1 variant (staging strip + entrypoint)
@@ -57,7 +60,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -72,6 +75,16 @@ link the real classes and exercise them:
   match the production format strings character for character. A drifted doc
   otherwise produces a false negative: the user sees a log that does not match
   the README and concludes the fix did not apply, when it did.
+- `GpuDetectProbe` - calls the real `EnvironmentDiagnostics.detectGpu()` and
+  requires a non-blank GPU name on Windows. The class key `{4d36e968-...}` has
+  no `DriverDesc` of its own - it lives in the per-adapter subkeys - so the
+  class-key query fails and the GPU line never reaches the report.
+- `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
+  a real `CallbackInfoReturnable`. This is the core of the fix, and until this
+  probe existed **nothing ever executed it**: the mirror cannot catch a bug in
+  the production code, and the README probe only compares log strings. It
+  asserts the dangerous parameters (`d3d11va`, `dxva2`, `direct3d11`) are gone
+  afterwards, for both `--key value` and `--key=value` spellings.
 
 Every behaviour probe has a **negative test**: break the production code (or the
 README) and the probe must fail. A test that cannot fail is not a test.

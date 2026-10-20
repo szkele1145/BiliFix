@@ -258,5 +258,22 @@ try {
     Get-Content "$gpuDir\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
     if ($gpuP.ExitCode -ne 0) { throw 'GPU probe FAILED (detectGpu returned nothing - the GPU line never reaches the report)' }
     Write-Host 'GPU probe OK' -ForegroundColor Green
+
+    # Argument rewrite probe: the core of the fix is the argument rewriting
+    # in JarToolMixin, and until now nothing actually EXECUTED it (Regression
+    # is an independent mirror; the README probe only compares log strings).
+    $mixinForAr = (Get-ChildItem "$libs\mixin-*.jar" | Select-Object -First 1).FullName
+    if ($mixinForAr) {
+        $arDir = Join-Path $OutDir 'arg-probe'
+        New-Item -ItemType Directory -Force -Path $arDir | Out-Null
+        & $javac -encoding UTF-8 -proc:none -cp "$outClasses;$mixinForAr;$slf4jForGpu" -d $arDir (Join-Path $root 'src\test\java\ArgumentRewriteProbe.java')
+        if ($LASTEXITCODE -ne 0) { throw 'Argument rewrite probe compile failed' }
+        $arP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$arDir;$outClasses;$mixinForAr;$slf4jForGpu", 'ArgumentRewriteProbe') `
+                -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+                -RedirectStandardOutput "$arDir\stdout.txt" -RedirectStandardError "$arDir\stderr.txt"
+        Get-Content "$arDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+        if ($arP.ExitCode -ne 0) { throw 'Argument rewrite probe FAILED (the hardening logic did not behave as required)' }
+        Write-Host 'Argument rewrite probe OK' -ForegroundColor Green
+    }
 }
 finally { Pop-Location }

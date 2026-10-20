@@ -46,12 +46,19 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 ## Infrastructure
 
 - ✅ One-command build (131 tests + jar integrity gate)
-- ✅ **All three build scripts run the full suite** - Regression (131) plus three
+- ✅ **All three build scripts run the full suite** - Regression (131) plus five
   behaviour probes that link the production classes: `ConcurrentRecordProbe`
   (event cap under 32-thread load), `FmlBridgeProbe` (FML reflection chain
   against stub classes under the real package names), `ReadmeLogSampleProbe`
-  (README log samples vs the production format strings). Previously only
-  `build.ps1` tested, leaving the two 1.20.1 variants unguarded
+  (README log samples vs the production format strings), `GpuDetectProbe`
+  (the GPU model really reaches the diagnostic report) and
+  `ArgumentRewriteProbe` (the hardening logic itself, which until now was
+  never executed by any test). Previously only `build.ps1` tested, leaving the
+  two 1.20.1 variants unguarded
+- ✅ Every behaviour probe has a **negative test** proving it can fail:
+  concurrency (event list exceeds the cap), FML bridge (missing `get()`),
+  README (version drift), GPU (reverted to the class-key query), argument
+  rewrite (old value kept / `=` form unrewritten)
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)

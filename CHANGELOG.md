@@ -28,6 +28,18 @@
   FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
 
 ### 新增
+- **参数改写探针**（`src/test/java/ArgumentRewriteProbe.java`，76 断言）：**整个修复的核心
+  ——`JarToolMixin` 的参数改写逻辑此前从未被真正执行过**。`Regression` 是独立镜像
+  （抓不到生产代码自身的错），`ReadmeLogSampleProbe` 只比对日志**字符串**。本探针
+  反射调用生产的 `bilifix$makeArgsSafe`，传入真实的 `CallbackInfoReturnable`，
+  覆盖：两种参数写法（`--key value` / `--key=value`）、旧值丢弃、`vout=original`
+  保留原值、缺失时主动追加、非 arguments 资源不处理、null/空数组不处理，
+  以及最关键的安全属性——**改写后不得残留 `d3d11va` / `dxva2` / `direct3d11`**
+  > 探针编写时踩到的坑：`CallbackInfoReturnable.setReturnValue()` 内部会先调
+  > `cancel()`，而 `cancel()` 在非 cancellable 时抛 `CancellationException`。
+  > 探针构造时必须传 `cancellable=true`，与生产 mixin 的声明一致
+  - **负向测试实证**（`out/neg-argrewrite.ps1`）：两种独立破坏方式都被抓住——
+    ① 不再丢弃旧值 → 9 条断言失败；② 不再改写 `--key=value` 形式 → 3 条断言失败
 - **GPU 检测探针**（`src/test/java/GpuDetectProbe.java`，7 断言）：反射调用生产的
   `EnvironmentDiagnostics.detectGpu()`，要求在 Windows 上返回**非空 GPU 名称**，
   且不含 `reg` 错误文本 / 无 `\r\n\t` 格式残留、重复调用结果稳定。这是唯一能

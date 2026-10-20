@@ -38,13 +38,14 @@ src/main/resources/
   META-INF/neoforge.mods.toml  # FML metadata (also copied to mods.toml)
   bilifix.mixins.json          # mixin config (@Pseudo, defaultRequire=0; stays JAVA_21,
                                #   1.20.1 variants rewrite to JAVA_17 at packaging)
-src/test/java/Regression.java # 131 assertions, mirrors production logic 1:1
+src/test/java/Regression.java # 137 assertions, mirrors production logic 1:1
 src/test/java/ConcurrentRecordProbe.java  # links production classes: event cap under load
 src/test/java/FmlBridgeProbe.java         # links production classes: FML reflection chain
 src/test/java/ReadmeLogSampleProbe.java   # README log samples vs production strings
 src/test/java/GpuDetectProbe.java         # links production classes: GPU detection really works
 src/test/java/ArgumentRewriteProbe.java   # links production classes: the hardening logic itself
 src/test/java/ForensicsSuppressionProbe.java  # links production classes: suppression must not leak across threads
+src/test/java/ConfigParseProbe.java      # links production classes: a UTF-8 BOM must not drop the first setting
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
@@ -61,7 +62,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -84,6 +85,11 @@ link the real classes and exercise them:
   counters so it does not fake a "media touched" signal. That suppression must
   be thread-local: a global flag also swallows a real playback happening on the
   media thread, losing the evidence the diagnostic file exists to provide.
+- `ConfigParseProbe` - calls the real `BiliFixConfig.parse()`. A UTF-8 BOM must
+  not drop the first setting: Windows editors save with a BOM by default and
+  `Files.readAllLines` does not strip it, so `hwDecoder` would be silently
+  ignored while `vout` and `verbose` kept working - the config looks "half
+  applied" and nothing points at the BOM.
 - `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
   a real `CallbackInfoReturnable`. This is the core of the fix, and until this
   probe existed **nothing ever executed it**: the mirror cannot catch a bug in

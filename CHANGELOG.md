@@ -28,6 +28,11 @@
   FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
 
 ### 新增
+- **配置解析探针**（`src/test/java/ConfigParseProbe.java`，18 断言）：反射调用生产
+  `parse()`，覆盖 UTF-8 BOM / 无 BOM / BOM+注释 / BOM+空行，以及引号内嵌 `#`、
+  行内注释、裸值等既有能力的回归守护。**已接入三个构建脚本**
+  - **负向测试实证**（`out/neg-configparse.ps1`）：回退到不处理 BOM 的 `parse()`
+    → 3 条断言失败
 - **取证抑制探针**（`src/test/java/ForensicsSuppressionProbe.java`，9 断言）：验证启动自检
   的取证抑制**不跨线程泄漏**（详见下方修复项）。**已接入三个构建脚本**
   - **负向测试实证**（`out/neg-forensics.ps1`）：回退到全局布尔 → 4 条断言失败
@@ -51,6 +56,14 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **配置文件里的 UTF-8 BOM 会静默吃掉用户的 `hwDecoder` 设置**——`parse()` 用
+  `Files.readAllLines(path, UTF_8)`，该方法**不剥离 BOM**。Windows 上记事本等
+  编辑器默认以"UTF-8 带 BOM"保存 → 首个 key 变成 `"\uFEFFhwDecoder"` →
+  `containsKey("hwDecoder")` 为 **false** → 用户改的硬解策略**完全无效**。
+  - 实测（修复前）：带 BOM → `containsKey(hwDecoder) = false`；不带 BOM → `true`
+  - 隐蔽点：只有**第一个**键受影响，`vout`/`verbose` 照常生效——用户看到的是
+    "配置生效了一半"，完全无法联想到是 BOM
+  - 修复：`parse()` 剥离首行的 U+FEFF
 - **取证抑制跨线程泄漏，真实播放被静默吞掉**——启动自检
   （`MixinTargetGuard.functionalProbe`）会真的调用一次 `JarTool.readArray`，
   为此用 `CrashSentinel.setForensicsSuppressed(true)` 抑制取证计数，避免把

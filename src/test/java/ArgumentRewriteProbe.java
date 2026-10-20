@@ -184,7 +184,13 @@ public class ArgumentRewriteProbe {
         check("vout=  original  （空白）→ null", voutValue("  original  ") == null);
         check("vout=gl,any → gl,any", "gl,any".equals(voutValue("gl,any")));
         check("vout=GL,ANY → 小写化", "gl,any".equals(voutValue("GL,ANY")));
-        check("vout=空串 → 空串（不擅自改语义）", "".equals(voutValue("")));
+        // v1.4.8：空串此前原样返回，会让 mixin 写出 `--vout ""`——一个空的视频
+        // 输出模块名交给 libVLC。不崩，只是没画面，比崩溃更隐蔽（用户会怪
+        // watermedia）。hwDecoder 早就回退安全默认了，两个字段行为必须一致。
+        check("vout=空串 → 回退安全默认 gl,any（不是空串！）",
+                "gl,any".equals(voutValue("")));
+        check("vout=纯空白 → 回退安全默认 gl,any",
+                "gl,any".equals(voutValue("   ")));
         check("vout=null → null（保留原值）", voutValue(null) == null);
 
         // 9. 配置为空串时不得崩（生产 load() 允许空值落盘）
@@ -194,6 +200,18 @@ public class ArgumentRewriteProbe {
         check("空配置：不抛异常且返回非 null", out9 != null);
         check("空配置：--avcodec-hw 仍被替换（值随配置）", contains(out9, "--avcodec-hw"));
         check("空配置：旧 d3d11va 值已丢弃", !contains(out9, "d3d11va,dxva2,any"));
+        // v1.4.8：这一组此前**只查了 hw**，vout 漏了——于是"空 vout 会写出
+        // --vout ''"这个缺陷在探针里毫无痕迹。补上。
+        check("空配置：--vout 的值不是空串（不能把空模块名交给 libVLC）",
+                indexOf(out9, "--vout") >= 0
+                        && indexOf(out9, "--vout") + 1 < out9.length
+                        && !out9[indexOf(out9, "--vout") + 1].isEmpty());
+        check("空配置：--vout 回退到安全默认 gl,any",
+                indexOf(out9, "--vout") >= 0
+                        && indexOf(out9, "--vout") + 1 < out9.length
+                        && "gl,any".equals(out9[indexOf(out9, "--vout") + 1]));
+        check("空配置：旧的 direct3d11 vout 值已丢弃",
+                !contains(out9, "direct3d11,glwin32,gl,any"));
         setConfig("none", "gl,any", false);
 
         // 10. hwDecoder=auto（用户显式要硬解）时，参数里应出现 any 而不是 none

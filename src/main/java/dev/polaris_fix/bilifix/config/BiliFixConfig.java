@@ -143,13 +143,32 @@ public final class BiliFixConfig {
         };
     }
 
-    /** vout 的最终 VLC 参数值："original" 表示保留 watermedia 原始值；其他值标准化为小写 */
+    /**
+     * vout 的最终 VLC 参数值："original" 表示保留 watermedia 原始值；其他值标准化为小写。
+     *
+     * <p><b>空值必须回退到安全默认</b>（v1.4.8 修复）：{@code vout = ""}（用户把值
+     * 清空了）此前原样返回空串，mixin 会写出 {@code --vout ""}——一个<b>空的视频输出
+     * 模块名</b>交给 libVLC。这比崩溃更隐蔽：不崩，只是没有画面，用户会以为是
+     * watermedia 或别的 mod 的问题。而 {@link #hwDecoderValue()} 对同样的空值早就
+     * 回退到安全默认并警告了——两个字段行为不一致，早晚会有人踩到。
+     * 现在空串与纯空白一律回退 {@link #DEFAULT_VOUT} 并给出警告。</p>
+     *
+     * <p>注意与 {@code null} 的区别：{@code null} 表示"未设置 / 保留原值"
+     * （{@code original} 的别名），空串表示"用户设置了但内容为空"——后者是
+     * 配置错误，回退；前者是合法语义，保留。</p>
+     */
     public static String voutValue() {
         if (vout == null) return null;
         String v = vout.toLowerCase().trim();
         return switch (v) {
             case "original", "keep" -> null; // null → 不替换
-            default -> v;
+            default -> {
+                if (v.isEmpty()) {
+                    BiliFixMod.LOGGER.warn("[BiliFix] vout 配置为空，已回退到安全默认 {}", DEFAULT_VOUT);
+                    yield DEFAULT_VOUT;
+                }
+                yield v;
+            }
         };
     }
 

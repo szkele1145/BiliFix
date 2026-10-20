@@ -49,6 +49,8 @@ src/test/java/ConfigParseProbe.java      # links production classes: a UTF-8 BOM
 src/test/java/MixinTargetGuardProbe.java # links production classes: the silent-skip guard, vs real stubs
 src/test/java/StartupLogTruthProbe.java  # links production classes: the startup line must show the effective value
 src/test/java/ForensicsVoutProbe.java    # links production classes: the diagnostics file must not say vout=null
+src/test/java/UnknownConfigKeyProbe.java  # links production classes: a mistyped config key must be visible
+src/test/stubs/slf4j/          # a capturing SLF4J provider, so log output can be asserted on
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
@@ -65,7 +67,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe`, `UnknownConfigKeyProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -119,6 +121,18 @@ link the real classes and exercise them:
   written verbatim that reads as "the setting is gone or broken". The
   probe asserts the file says `original`, for both the diagnostics file
   and the session lock.
+- `UnknownConfigKeyProbe` - `parse()` keeps every key in the file, but
+  `load()` only reads three of them. Everything else was dropped without
+  a word: the log said "已加载配置" and the user believed the setting
+  applied. Most common case: `hwdecoder` (lower-case `d`) loaded
+  "successfully" while the decoder stayed on software. The probe
+  installs a capturing SLF4J provider (`src/test/stubs/slf4j/`) - a
+  bare slf4j-api degrades to a NOP logger and the warning could not be
+  observed at all. Two traps: the test config file MUST be named
+  `bilifix.toml` (any other name takes the "generate defaults" branch
+  and the probe tests nothing), and the SPI registration file must have
+  no BOM (ServiceLoader does not strip one, so the provider would never
+  load and every assertion would see empty logs).
 - `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
   a real `CallbackInfoReturnable`. This is the core of the fix, and until this
   probe existed **nothing ever executed it**: the mirror cannot catch a bug in

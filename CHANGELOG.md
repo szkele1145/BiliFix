@@ -74,6 +74,19 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **写错的配置键被静默忽略**——`parse()` 会把配置里的**所有**键放进 map，
+  而 `load()` 只读 `hwDecoder` / `vout` / `verbose` 三个，其余**无声丢弃**：
+  日志只打印一句"已加载配置"，用户以为自己改的配置生效了
+  - 实测（修复前）：配置写 `hwdecoder = "any"`（`d` 小写，最常见的笔误）→
+    加载"成功"、日志无任何提示、实际解码器仍是 `none`（软解）。
+    用户设了硬解，得到软解，且毫无线索
+  - 与 UTF-8 BOM 是**同族缺陷**：用户改了配置、文件也"加载成功"、
+    设置没生效、日志不指向任何原因
+  - 修复：`load()` 对未识别的键发警告，并区分最常见原因（大小写写错）
+    与真正的未知键：
+    `[BiliFix] 配置键 'hwdecoder' 拼写不对（键名区分大小写），应为 'hwDecoder'——本次该设置未生效`
+  - 探针 `src/test/java/UnknownConfigKeyProbe.java`（10 断言）；
+    负向测试 `out/neg-unknownkey.ps1`（还原后 3 通过 / 7 失败）
 - **取证文件里的 `vout=null` 会让用户以为配置坏了**——`writeDiagnostic`（写
   `bilifix-diagnostic.txt`）与 `markSessionStart`（写 `bilifix-session.lock`）
   直接写 `voutValue()` 的返回值。用户显式配置 `vout = "original"`（或 `keep`）时，

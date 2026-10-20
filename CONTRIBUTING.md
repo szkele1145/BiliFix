@@ -52,6 +52,7 @@ src/test/java/ForensicsVoutProbe.java    # links production classes: the diagnos
 src/test/java/UnknownConfigKeyProbe.java  # links production classes: a mistyped config key must be visible
 src/test/java/NullElementProbe.java       # links production classes: a null argument entry must not crash the mixin
 src/test/java/FmlModVersionProbe.java      # links production classes: FmlBridge.modVersion's success path
+src/test/java/ConfigDefaultProbe.java    # links production classes: the default values have ONE source of truth
 src/test/stubs-fmlmodlist/                 # ModList + IModFileInfo stubs (kept OUT of src/test/stubs on purpose)
 src/test/negative/                         # negative tests: every probe must be able to fail
 src/test/negative/run-all-negative-tests.ps1  # runs all of them; any failure fails the build

@@ -74,6 +74,17 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖
 - **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖
   "ModList 不存在"时的降级；而成功路径（找到 ModList → 调
   `getModFileById` → 调 `versionString`）**零覆盖**。这条路径坏了，
@@ -407,7 +418,18 @@
 - 退出快照新增 `media touched` 字段：区分"本次确实播放过媒体"与"只是开着游戏"
 - 取证全程 `catch (Throwable)` 兜底：取证失败绝不影响游戏运行
 
-### 修复：崩溃结论会被随后的正常退出覆盖
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖：崩溃结论会被随后的正常退出覆盖
 - 问题：结论原先只写在 `bilifix-diagnostic.txt` 里，而该文件每次干净退出都会重写。
   用户的真实使用顺序是"崩溃 → 重启 → 干点别的 → 正常退出 → 这时才去看文件"，
   于是唯一带证据的那次会话的结论被覆盖掉了
@@ -419,19 +441,52 @@
 
 ## 1.4.6 — 2026-10-15
 
-### 修复（第 20 轮审查：语义与行为一致）
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖（第 20 轮审查：语义与行为一致）
 - 配置加载失败分支现在**真的**重置字段为安全默认（此前日志称"使用默认值"但字段保留上次值——
   首次加载无行为差异，但为未来 reload 埋雷）
 
 ## 1.4.5 — 2026-10-15
 
-### 修复（第 18 轮审查：失败语义）
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖（第 18 轮审查：失败语义）
 - Mixin 注入器 `defaultRequire` 1 → 0：未来 watermedia 若重构掉注入目标，
   修复**静默失效**（仅警告）而非升级为 mod 加载错误——修复 mod 绝不能把游戏搞挂
 
 ## 1.4.4 — 2026-10-15
 
-### 修复（第 15 轮审查）
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖（第 15 轮审查）
 - 诊断的 mod 版本显示拦截未替换的 `${...}` 占位符（bilibili_media 2.3 的 mods.toml
   存在此类打包瑕疵，会把垃圾值当"版本"显示进日志）
 
@@ -480,7 +535,18 @@
 
 ## 1.3.2 — 2026-10-14
 
-### 修复（代码审查 #7：配置写入原子性）
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖（代码审查 #7：配置写入原子性）
 - 默认配置改为原子写入（临时文件 + `ATOMIC_MOVE`）：磁盘满或进程中断不再可能留下损坏的半截配置文件
 - 文件系统不支持原子移动时自动降级为普通 move
 
@@ -493,7 +559,18 @@
 
 ## 1.3.1 — 2026-10-14
 
-### 修复（代码审查 #3）
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖（代码审查 #3）
 - GPU 检测的管道死锁隐患：改为后台线程读流后再 waitFor（防注册表输出超管道缓冲区时卡游戏）
 
 ## 1.3.0 — 2026-10-14
@@ -504,7 +581,18 @@
 
 ## 1.2.1 — 2026-10-14
 
-### 修复（配置解析鲁棒性）
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖（配置解析鲁棒性）
 - 支持行内注释：`vout = "gl,any" # 说明` 不再被解析成坏值
 - 引号内 `#` 正确保留
 - 未闭合引号容错处理
@@ -519,7 +607,18 @@
 
 ## 1.1.1 — 2026-10-14
 
-### 修复（代码审查发现）
+### 修复
+- **配置默认值有四个真源**——`none` / `gl,any` / `false` 此前散落在**四处**：
+  静态字段初值、`load()` 异常重置、`writeDefault()` **写进用户文件**的内容、
+  `hwDecoderValue()` 未知值回退。任何一处漂移就会出现：用户拿到的配置文件
+  写着一套策略，实际生效的是另一套，而加载日志说的是"已加载配置"——
+  **没有任何异常提示**。典型的静默失效路径
+  - 修复：提为三个 `DEFAULT_*` 常量（`BiliFixConfig`），四处全部引用
+  - 探针 `src/test/java/ConfigDefaultProbe.java`（14 断言，**行为级**：
+    真的生成配置文件、真的加载、真的回退，不只比对源码文本）
+  - 负向测试 `src/test/negative/neg-cfgdefault.ps1`（默认值漂移 →
+    12 通过 / 2 失败）
+- **`FmlBridge.modVersion` 的成功路径从未被测过**——`FmlBridgeProbe` 只覆盖（代码审查发现）
 - **严重**：watermedia 未安装时 Mixin 硬失败会拖崩游戏启动——加 `@Pseudo` 注解 + mixins.json `required: false`，现在 watermedia 缺失时 BiliFix 静默跳过，绝不添乱
 - **未来防御**：watermedia 参数表若不再含 `--avcodec-hw` / `--vout`，现在会**主动补加**安全参数，防止上游改版导致修复失效
 - `isValue` 边界收紧：以 `-` 开头（含短选项）一律不当作参数值

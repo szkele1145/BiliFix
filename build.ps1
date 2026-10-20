@@ -309,6 +309,23 @@ if (Test-Path "$root\src\test\java\StartupLogTruthProbe.java") {
     if ($ukP.ExitCode -ne 0) { throw "Unknown config key probe FAILED (a mistyped config key is silently ignored)" }
     Write-Host "Unknown config key probe OK" -ForegroundColor Green
 
+    # Config default probe: the default values (none / gl,any / false) used to be
+    # hard-coded in FOUR places - the field initialisers, the load() exception
+    # reset, the file written to the user, and the unknown-value fallback. Any one
+    # of them drifting means the user's config file says one thing while the
+    # effective behaviour is another - and the log says "config loaded", so
+    # nothing points at the cause.
+    $cdOut = "$OutDir\cfgdefault-probe"
+    New-Item -ItemType Directory -Force -Path $cdOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $cdOut "$root\src\test\java\ConfigDefaultProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Config default probe compile failed" }
+    $cdP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$cdOut;$OutDir\classes;$slf4jJar", 'ConfigDefaultProbe', 'src/main/java/dev/polaris_fix/bilifix/config/BiliFixConfig.java') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$cdOut\stdout.txt" -RedirectStandardError "$cdOut\stderr.txt"
+    Get-Content "$cdOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($cdP.ExitCode -ne 0) { throw "Config default probe FAILED (the default values have more than one source of truth)" }
+    Write-Host "Config default probe OK" -ForegroundColor Green
+
     # Null element probe: a null entry in the argument array must not make the
     # hardening logic throw. JarTool.readArray is a GENERAL method - watermedia
     # may read other JSON with it, and a null entry would blow up switch (arg).

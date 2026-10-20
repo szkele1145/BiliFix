@@ -23,6 +23,21 @@ import java.util.Map;
  *   verbose   = true|false                                        打印替换详情
  */
 public final class BiliFixConfig {
+
+    // ---------- 默认值：单一真源 ----------
+    // 为什么必须提出来（v1.4.8 审查发现）："none" / "gl,any" / false 这三个
+    // 默认值此前**散落在四个地方**——静态字段初始值、load() 的异常重置、
+    // writeDefault() 写进用户文件的内容、hwDecoderValue() 未知值回退。
+    // 任何一处漏改，用户拿到的配置与实际生效的策略就不一致，而日志显示的
+    // 是"已加载配置"，不会提示任何异常——又一条静默失效路径。
+    // 改默认值只能改这里。
+    /** 默认硬解策略：软件解码（最稳，修复崩溃） */
+    public static final String DEFAULT_HW_DECODER = "none";
+    /** 默认视频输出策略：OpenGL（安全） */
+    public static final String DEFAULT_VOUT = "gl,any";
+    /** 默认是否打印完整参数对比 */
+    public static final boolean DEFAULT_VERBOSE = false;
+
     /**
      * 软解（默认，最稳定，修复崩溃）。
      *
@@ -34,11 +49,11 @@ public final class BiliFixConfig {
      * 回来），但 {@code hwDecoder = "any"} 之类的高危自定义可能读不到。
      * 引用写入本身原子，volatile 只补可见性，零运行时成本。</p>
      */
-    public static volatile String hwDecoder = "none";
+    public static volatile String hwDecoder = DEFAULT_HW_DECODER;
     /** 视频输出：默认去掉 direct3d11 偏好（volatile 理由同 {@link #hwDecoder}） */
-    public static volatile String vout = "gl,any";
+    public static volatile String vout = DEFAULT_VOUT;
     /** 是否在日志打印完整参数对比（volatile 理由同 {@link #hwDecoder}） */
-    public static volatile boolean verbose = false;
+    public static volatile boolean verbose = DEFAULT_VERBOSE;
 
     /**
      * 外部注入的配置目录（Fabric 侧用）。为 null 时回退到 FML 的 CONFIGDIR，
@@ -104,17 +119,18 @@ public final class BiliFixConfig {
             }
         } catch (Exception e) {
             // 显式重置为安全默认：日志说"使用默认值"就必须真的重置——
-            // 静态字段保留的是上次值（首次加载恰好等于默认，但未来 reload 时会残留用户旧值）
-            hwDecoder = "none";
-            vout = "gl,any";
-            verbose = false;
+            // 静态字段保留的是上次值（首次加载恰好等于默认，但未来 reload 时会残留用户旧值）。
+            // 重置到 DEFAULT_* 常量，不另写一份字面量（v1.4.8：默认值提为单一真源）。
+            hwDecoder = DEFAULT_HW_DECODER;
+            vout = DEFAULT_VOUT;
+            verbose = DEFAULT_VERBOSE;
             BiliFixMod.LOGGER.warn("[BiliFix] 配置加载失败，已重置为默认值（软解）: {}", e.toString());
         }
     }
 
     /** hwDecoder 的最终 VLC 参数值："disable" 与 "none" 等价；未知值回退 none 并警告 */
     public static String hwDecoderValue() {
-        if (hwDecoder == null) return "none";
+        if (hwDecoder == null) return DEFAULT_HW_DECODER;
         return switch (hwDecoder.toLowerCase().trim()) {
             case "disable", "none", "off" -> "none";
             case "auto", "any" -> "any";
@@ -122,7 +138,7 @@ public final class BiliFixConfig {
             case "dxva2" -> "dxva2";
             default -> {
                 BiliFixMod.LOGGER.warn("[BiliFix] 未知的 hwDecoder 配置值 '{}'，回退到安全默认 none", hwDecoder);
-                yield "none";
+                yield DEFAULT_HW_DECODER;
             }
         };
     }
@@ -200,15 +216,15 @@ public final class BiliFixConfig {
         lines.add("#   any     = VLC 自动选择硬解（可能复现崩溃）");
         lines.add("#   d3d11va = 强制 D3D11VA（高风险）");
         lines.add("#   dxva2   = 强制 DXVA2（高风险）");
-        lines.add("hwDecoder = \"none\"");
+        lines.add("hwDecoder = \"" + DEFAULT_HW_DECODER + "\"");
         lines.add("");
         lines.add("# 视频输出模块（vout）：");
         lines.add("#   gl,any    = OpenGL 输出（默认，安全）");
         lines.add("#   original  = 保留 watermedia 原始参数（direct3d11,glwin32,gl,any）");
-        lines.add("vout = \"gl,any\"");
+        lines.add("vout = \"" + DEFAULT_VOUT + "\"");
         lines.add("");
         lines.add("# 日志中打印完整参数替换详情");
-        lines.add("verbose = false");
+        lines.add("verbose = " + DEFAULT_VERBOSE);
         // 原子写：先写临时文件再 ATOMIC_MOVE，磁盘满/中断不会留下半个配置文件
         Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
         Files.write(tmp, lines, StandardCharsets.UTF_8);

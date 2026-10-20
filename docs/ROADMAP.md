@@ -49,7 +49,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 - ✅ **Every production class has a behaviour probe that links it** (9/9):
   `BiliFixMod`, `CrashSentinel`, `EnvironmentDiagnostics`, `MixinTargetGuard`,
   `BiliFixConfig`, `JarToolMixin`, `FmlBridge`
-- ✅ **All three build scripts run the full suite** - Regression (137) plus thirteen
+- ✅ **All three build scripts run the full suite** - Regression (137) plus fourteen
   behaviour probes that link the production classes: `ConcurrentRecordProbe`
   (event cap under 32-thread load), `FmlBridgeProbe` (FML reflection chain
   against stub classes under the real package names), `ReadmeLogSampleProbe`
@@ -74,7 +74,11 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   thing that cannot break playback) and `FmlModVersionProbe` (the
   SUCCESS path of `FmlBridge.modVersion`, which until now had no coverage
   at all - if it breaks, the diagnostics report an installed watermedia as
-  missing). Previously only
+  missing) and `ConfigDefaultProbe` (the default values must have exactly
+  ONE source of truth - they used to be hard-coded in four places, and a
+  drift there means the user's config file says one thing while the
+  effective behaviour is another, with the log claiming the config loaded
+  fine). Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
   concurrency (event list exceeds the cap), FML bridge (missing `get()`),
@@ -86,7 +90,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   (raw voutValue() written to the diagnostics file again), unknown
   config key (the warning removed again), null element
   (both null guards removed again), FML mod version
-  (the version lookup replaced by the mod id)
+  (the version lookup replaced by the mod id), config default (the defaults hard-coded again)
 - ✅ **Negative tests are in the repository**. They used to live in `out/`,
   which is git-ignored: the evidence that the probes can actually fail
   existed on one machine only. Now they live in `src/test/negative/` and

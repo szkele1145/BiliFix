@@ -168,5 +168,18 @@ try {
     & $javaExe -cp "$probeDir;$(Join-Path $OutDir 'classes')" ConcurrentRecordProbe
     if ($LASTEXITCODE -ne 0) { throw 'concurrency probe FAILED (event cap not held under load)' }
     Write-Host 'Concurrency probe OK' -ForegroundColor Green
+
+    # FmlBridge probe: FmlBridge is the one production class with no coverage and
+    # sits on the critical path (CrashSentinel.gameDirectory()). Stub FML classes
+    # live under the REAL package name so the production forName -> constant ->
+    # get() -> Path chain runs end to end.
+    $fmlDir = Join-Path $OutDir 'fmlbridge-probe'
+    New-Item -ItemType Directory -Force -Path $fmlDir | Out-Null
+    $stubSrcs = Get-ChildItem (Join-Path $root 'src\test\stubs') -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+    & $javac -encoding UTF-8 -proc:none -cp (Join-Path $OutDir 'classes') -d $fmlDir @stubSrcs (Join-Path $root 'src\test\java\FmlBridgeProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'FmlBridge probe compile failed' }
+    & $javaExe -cp "$fmlDir;$(Join-Path $OutDir 'classes')" FmlBridgeProbe
+    if ($LASTEXITCODE -ne 0) { throw 'FmlBridge probe FAILED (fmlDir chain or the no-throw contract broke)' }
+    Write-Host 'FmlBridge probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

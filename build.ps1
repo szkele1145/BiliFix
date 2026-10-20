@@ -105,6 +105,24 @@ if (Test-Path "$root\src\test\java\ConcurrentRecordProbe.java") {
     Write-Host "Concurrency probe OK" -ForegroundColor Green
 }
 
+# FmlBridge probe (v1.4.8): FmlBridge is the only production class with no
+# coverage, and it sits on the critical path - CrashSentinel.gameDirectory()
+# uses it to find the game directory, so a silent null means the forensic files
+# cannot be written, exactly when a crash makes them matter.
+# The probe uses stub FML classes placed under the REAL package name, so the
+# production Class.forName -> enum constant -> get() -> Path chain runs end to
+# end instead of being mirrored in the test.
+if (Test-Path "$root\src\test\java\FmlBridgeProbe.java") {
+    $fmlOut = "$OutDir\fmlbridge-probe"
+    New-Item -ItemType Directory -Force -Path $fmlOut | Out-Null
+    $stubSrcs = Get-ChildItem "$root\src\test\stubs" -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes" -d $fmlOut @stubSrcs "$root\src\test\java\FmlBridgeProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "FmlBridge probe compile failed" }
+    & $javaExe -cp "$fmlOut;$OutDir\classes" FmlBridgeProbe
+    if ($LASTEXITCODE -ne 0) { throw "FmlBridge probe FAILED (fmlDir chain or the no-throw contract broke)" }
+    Write-Host "FmlBridge probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

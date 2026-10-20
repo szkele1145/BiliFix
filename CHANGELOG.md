@@ -172,6 +172,33 @@
   > §17 配置可见性守卫、§18 Mixin 目标守卫与 §19 取证污染守卫，
   > 故当前源码为 131
   > （`./build.ps1` 实测"通过 131 / 失败 0"）。
+- **新增三项行为级探针**（区别于 Regression 的独立镜像：这三项**链接生产 classes**，
+  真实调用生产方法）：
+  - `ConcurrentRecordProbe`——32 线程 × 500 次并发调用生产 `CrashSentinel.record()`，
+    事件数必须恰停在 `MAX_EVENTS`（64）。§14 只断言源码里有 `synchronized` 关键字，
+    那是"检查药方"不是"检查疗效"。**负向实证**：副本中去掉 `synchronized` → 事件数
+    冲到 **93 > 64**（check-then-act 竞态真实触发），`RESULT=FAIL`、退出码 1
+  - `FmlBridgeProbe`——`FmlBridge` 是最后一个零覆盖的生产类，却在关键路径上
+    （`CrashSentinel.gameDirectory()` 靠它定位游戏目录，返回 null 就意味着取证文件
+    写不出来——恰是崩溃时最需要证据的时刻）。用**真实包名**下的 stub
+    （`net.neoforged.fml.loading.FMLPaths` 形状正确 / `net.minecraftforge.fml.loading.FMLPaths`
+    无 `get()`）让生产的 `Class.forName` 真的解析到它，端到端覆盖
+    "forName → 枚举常量 → get() → Path"链路与"绝不抛异常"契约。9/9 通过。
+    **负向实证**：去掉真实 `FmlBridge` 里的 `get()` → 3 条正向断言全 FAIL、退出码 1
+  - `ReadmeLogSampleProbe`——README 里教用户 grep 的日志行必须与生产格式串
+    **逐字符一致**（全角冒号、全角箭头、` , ` 分隔符）。文档漂移会造成**假阴性**：
+    用户看到的日志与 README 对不上，会误判"修复没生效"，而其实生效了。19/19 通过。
+    **负向实证**：把 README 的 `v1.4.8 已加载` 改成 `v1.4.7` → 探针 FAIL、退出码 1
+- **构建把关补齐**：此前**只有 `build.ps1` 跑测试**，`build-forge.ps1` /
+  `build-fabric.ps1` 零把关——改坏 `CrashSentinel`/`BiliFixConfig` 后只跑 1.20.1
+  构建会直接产出坏 jar。现三个脚本一律跑：Regression(131) + 并发探针 +
+  FmlBridge 探针 + README 探针（打包后运行，使 §9.6b 的 jar 结构断言也覆盖
+  该变体自己的产物）。**负向实证**：临时删掉 `synchronized` → 两个 1.20.1 构建
+  路径均 `regression tests failed`、退出码 1（分别验证）
+  > 接线备注：探针链接 `BiliFixMod` 故需 slf4j-api 在 classpath 上；SLF4J 的
+  > `No SLF4J providers were found.` 提示走 stderr，PowerShell 会把 native stderr
+  > 当成致命错误记录，**探针明明通过却让构建中断**——改用 `Start-Process` 分离
+  > stdout/stderr，并以**进程退出码**为判据（`Start-Process` 不更新 `$LASTEXITCODE`）。
 
 ### 文档
 - 修正文档失真（均有会话日志实证）：
@@ -182,6 +209,11 @@
   - README（中/英）示例日志的"原 16 项 → 新 16 项"实为 **18 项**
     （v1.3.2 与 v1.4.4 会话均实证），并补充说明该数字随 watermedia 版本变化
   - README（中/英）、CONTRIBUTING 的测试数 66 → 85
+  - **README（中/英）补上 v1.4.8 的功能自检说明**——`功能自检通过: --avcodec-hw=...
+    , --vout=... —— 注入已生效（端到端验证）` 是"修复是否生效"的**最终判据**，
+    此前只存在于代码里而不在任何文档中，用户无从得知**不播放视频也能确认修复生效**。
+    同步补一张对照表说明每行日志的含义与缺失时的含义（特别标注：`VLC 参数已加固`
+    缺失只意味着"还没播过视频"，**不是故障**）
   - ROADMAP 的"15+ min stable"未标注版本归属，已改为明确列出 v1.3.2 / v1.4.4
     的证据与"v1.4.7 从未启动"的事实
 

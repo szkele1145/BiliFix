@@ -13,10 +13,15 @@ failures degrade silently (warnings at most), never escalate to load errors.
 ```powershell
 git clone https://github.com/szkele1145/BiliFix
 cd BiliFix
-./build.ps1        # compile + 131 regression tests + jar integrity check
+./build.ps1        # compile + 131 regression tests + 3 behaviour probes + jar integrity check
 ```
 
 Requirements: any JDK 21 (the build auto-detects `.tools\jdk21`, the MC runtime, or PATH).
+
+> All three build scripts (`build.ps1`, `build-forge.ps1`, `build-fabric.ps1`) run the
+> same suite. That is deliberate: when only `build.ps1` ran tests, the two 1.20.1
+> variants had **zero** safety net - a broken `CrashSentinel` would ship straight
+> into their jars. If you only build one variant, the others are still guarded.
 
 ## Project Layout
 
@@ -34,6 +39,10 @@ src/main/resources/
   bilifix.mixins.json          # mixin config (@Pseudo, defaultRequire=0; stays JAVA_21,
                                #   1.20.1 variants rewrite to JAVA_17 at packaging)
 src/test/java/Regression.java # 131 assertions, mirrors production logic 1:1
+src/test/java/ConcurrentRecordProbe.java  # links production classes: event cap under load
+src/test/java/FmlBridgeProbe.java         # links production classes: FML reflection chain
+src/test/java/ReadmeLogSampleProbe.java   # README log samples vs production strings
+src/test/stubs/               # stub FML classes under the REAL package names
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
 build-forge.ps1    # Forge 1.20.1 variant (see docs/cross-loader-research.md)
 build-fabric.ps1   # Fabric 1.20.1 variant (staging strip + entrypoint)
@@ -41,16 +50,46 @@ deploy.ps1         # local mods + GitHub asset sync
 pending-modrinth.ps1  # auto-discovers and uploads versions missing from Modrinth
 ```
 
+## The Test Layers
+
+Not all tests are equal - know which layer you are looking at:
+
+| Layer | File | Links production code? | What it proves |
+| --- | --- | --- | --- |
+| Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe` | **Yes** | The production code actually behaves as intended |
+
+This distinction matters. `Regression`'s §14 asserts the source contains the keyword
+`synchronized` - that checks the prescription, not the effect. The behaviour probes
+link the real classes and exercise them:
+
+- `ConcurrentRecordProbe` - 32 threads hammer the real `CrashSentinel.record()`;
+  the event list must stay at exactly `MAX_EVENTS`.
+- `FmlBridgeProbe` - stub FML classes under the *real* package names answer the
+  production `Class.forName`, so the "forName -> enum constant -> get() -> Path"
+  chain runs end to end, plus the "never throws" contract.
+- `ReadmeLogSampleProbe` - the log lines the READMEs tell users to grep for must
+  match the production format strings character for character. A drifted doc
+  otherwise produces a false negative: the user sees a log that does not match
+  the README and concludes the fix did not apply, when it did.
+
+Every behaviour probe has a **negative test**: break the production code (or the
+README) and the probe must fail. A test that cannot fail is not a test.
+
 ## Making Changes
 
-1. **Run `./build.ps1` first** - it must be green before and after your change.
+1. **Run the build script for your variant first** - it must be green before and
+   after your change.
 2. If you touch arg-replacement or config-parsing logic, **mirror the change in
    `Regression.java`** and add a test for it (that file duplicates production logic
    by design - keep them in sync; see the header note about test blind spots).
-3. If you touch packaging or the mods.toml, run the **FML precheck list** described
+3. If the change is in `CrashSentinel`, `FmlBridge` or anything that logs a line
+   the READMEs quote, consider whether a behaviour probe or the README probe
+   should cover it.
+4. If you touch packaging or the mods.toml, run the **FML precheck list** described
    in `docs/postmortem-1.3.2.md` - the two launch-failure incidents both came from
    that layer, which tests do not cover.
-4. Verify the jar with a **strict full-entry read** (the build does this; never
+5. Verify the jar with a **strict full-entry read** (the build does this; never
    bypass it).
 
 ## Submitting

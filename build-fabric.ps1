@@ -220,7 +220,8 @@ try {
     # get() -> Path chain runs end to end.
     $fmlDir = Join-Path $OutDir 'fmlbridge-probe'
     New-Item -ItemType Directory -Force -Path $fmlDir | Out-Null
-    $stubSrcs = Get-ChildItem (Join-Path $root 'src\test\stubs') -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+    $stubSrcs = Get-ChildItem (Join-Path $root 'src\test\stubs') -Recurse -Filter '*.java' |
+        Where-Object { $_.FullName -notlike '*\stubs\slf4j\*' } | ForEach-Object { $_.FullName }
     & $javac -encoding UTF-8 -proc:none -cp $outClasses -d $fmlDir @stubSrcs (Join-Path $root 'src\test\java\FmlBridgeProbe.java')
     if ($LASTEXITCODE -ne 0) { throw 'FmlBridge probe compile failed' }
     & $javaExe -cp "$fmlDir;$outClasses" FmlBridgeProbe
@@ -341,5 +342,23 @@ try {
     Get-Content "$fvDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($fvP.ExitCode -ne 0) { throw 'Forensics vout probe FAILED (the diagnostics file misreports the vout strategy)' }
     Write-Host 'Forensics vout probe OK' -ForegroundColor Green
+
+    # Unknown config key probe: a mistyped config key must be VISIBLE, not silently dropped.
+    # Needs the capturing slf4j provider on the test classpath: slf4j-api without a
+    # provider degrades to a NOP logger, so the warning could not be observed at all.
+    $ukDir = Join-Path $OutDir 'unknownkey-probe'
+    New-Item -ItemType Directory -Force -Path $ukDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$outClasses;$slf4jForGpu" -d $ukDir (Join-Path $root 'src\test\stubs\slf4j\test\slf4j\CapturingServiceProvider.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Unknown key probe: capturing slf4j provider compile failed' }
+    New-Item -ItemType Directory -Force -Path (Join-Path $ukDir 'META-INF\services') | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $ukDir 'META-INF\services\org.slf4j.spi.SLF4JServiceProvider'), "test.slf4j.CapturingServiceProvider`n", (New-Object System.Text.UTF8Encoding($false)))
+    & $javac -encoding UTF-8 -proc:none -cp "$ukDir;$outClasses;$slf4jForGpu" -d $ukDir (Join-Path $root 'src\test\java\UnknownConfigKeyProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Unknown config key probe compile failed' }
+    $ukP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$ukDir;$outClasses;$slf4jForGpu", 'UnknownConfigKeyProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$ukDir\stdout.txt" -RedirectStandardError "$ukDir\stderr.txt"
+    Get-Content "$ukDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($ukP.ExitCode -ne 0) { throw 'Unknown config key probe FAILED (a mistyped config key is silently ignored)' }
+    Write-Host 'Unknown config key probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

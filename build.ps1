@@ -115,7 +115,8 @@ if (Test-Path "$root\src\test\java\ConcurrentRecordProbe.java") {
 if (Test-Path "$root\src\test\java\FmlBridgeProbe.java") {
     $fmlOut = "$OutDir\fmlbridge-probe"
     New-Item -ItemType Directory -Force -Path $fmlOut | Out-Null
-    $stubSrcs = Get-ChildItem "$root\src\test\stubs" -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
+    $stubSrcs = Get-ChildItem "$root\src\test\stubs" -Recurse -Filter '*.java' |
+        Where-Object { $_.FullName -notlike '*\stubs\slf4j\*' } | ForEach-Object { $_.FullName }
     & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes" -d $fmlOut @stubSrcs "$root\src\test\java\FmlBridgeProbe.java"
     if ($LASTEXITCODE -ne 0) { throw "FmlBridge probe compile failed" }
     & $javaExe -cp "$fmlOut;$OutDir\classes" FmlBridgeProbe
@@ -267,6 +268,25 @@ if (Test-Path "$root\src\test\java\StartupLogTruthProbe.java") {
     Get-Content "$fvOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($fvP.ExitCode -ne 0) { throw "Forensics vout probe FAILED (the diagnostics file misreports the vout strategy)" }
     Write-Host "Forensics vout probe OK" -ForegroundColor Green
+
+    # Unknown config key probe: a mistyped config key must be VISIBLE, not silently dropped.
+    # Needs the capturing slf4j provider on the test classpath: slf4j-api without a
+    # provider degrades to a NOP logger, so BiliFixMod.LOGGER.warn(...) produces
+    # nothing and the probe could not tell "warning not emitted" from "warning not captured".
+    $ukOut = "$OutDir\unknownkey-probe"
+    New-Item -ItemType Directory -Force -Path $ukOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $ukOut "$root\src\test\stubs\slf4j\test\slf4j\CapturingServiceProvider.java"
+    if ($LASTEXITCODE -ne 0) { throw "Unknown key probe: capturing slf4j provider compile failed" }
+    New-Item -ItemType Directory -Force -Path "$ukOut\META-INF\services" | Out-Null
+    [System.IO.File]::WriteAllText("$ukOut\META-INF\services\org.slf4j.spi.SLF4JServiceProvider", "test.slf4j.CapturingServiceProvider`n", (New-Object System.Text.UTF8Encoding($false)))
+    & $javac -encoding UTF-8 -proc:none -cp "$ukOut;$OutDir\classes;$slf4jJar" -d $ukOut "$root\src\test\java\UnknownConfigKeyProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Unknown config key probe compile failed" }
+    $ukP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$ukOut;$OutDir\classes;$slf4jJar", 'UnknownConfigKeyProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$ukOut\stdout.txt" -RedirectStandardError "$ukOut\stderr.txt"
+    Get-Content "$ukOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($ukP.ExitCode -ne 0) { throw "Unknown config key probe FAILED (a mistyped config key is silently ignored)" }
+    Write-Host "Unknown config key probe OK" -ForegroundColor Green
 }
 
 # Package

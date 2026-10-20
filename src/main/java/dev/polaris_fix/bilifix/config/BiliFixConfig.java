@@ -80,6 +80,23 @@ public final class BiliFixConfig {
                 if (kv.containsKey("hwDecoder")) hwDecoder = kv.get("hwDecoder");
                 if (kv.containsKey("vout"))      vout      = kv.get("vout");
                 if (kv.containsKey("verbose"))  verbose   = "true".equalsIgnoreCase(kv.get("verbose"));
+                // 未识别的 key 警告：写错的配置必须可见，否则就是又一条静默失效路径
+                // （与 UTF-8 BOM 同族——用户写了配置、文件也"加载成功"、但设置没生效，
+                // 且日志里没有任何指向原因的线索）。
+                for (String k : kv.keySet()) {
+                    if (k.equals("hwDecoder") || k.equals("vout") || k.equals("verbose")) continue;
+                    // 忽略大小写后能对上已知键 → 多半是大小写写错，给出可直接照做的提示
+                    String lower = k.toLowerCase();
+                    if (lower.equals("hwdecoder") || lower.equals("vout") || lower.equals("verbose")) {
+                        String correct = lower.equals("hwdecoder") ? "hwDecoder"
+                                       : lower.equals("vout") ? "vout" : "verbose";
+                        BiliFixMod.LOGGER.warn("[BiliFix] 配置键 '{}' 拼写不对（键名区分大小写），"
+                                + "应为 '{}'——本次该设置未生效", k, correct);
+                    } else {
+                        BiliFixMod.LOGGER.warn("[BiliFix] 配置里有未识别的键 '{}'"
+                                + "（已知键: hwDecoder / vout / verbose，区分大小写），该设置被忽略", k);
+                    }
+                }
                 // 触发一次校验，让无效值在启动时就发出警告
                 hwDecoderValue();
                 voutValue();

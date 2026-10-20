@@ -83,6 +83,12 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   (raw voutValue() written to the diagnostics file again), unknown
   config key (the warning removed again), null element
   (both null guards removed again)
+- ✅ **Negative tests are in the repository**. They used to live in `out/`,
+  which is git-ignored: the evidence that the probes can actually fail
+  existed on one machine only. Now they live in `src/test/negative/` and
+  `run-all-negative-tests.ps1` runs all of them - wired into the three
+  build scripts, the faithful CI simulation and the GitHub Actions
+  workflow.
 - ✅ One-command deploy (mods + GitHub asset, with retry)
 - ✅ One-command Modrinth sync (auto-discovers missing versions)
 - ✅ Self-contained toolchain (project JDK 21, survives MC runtime trims)

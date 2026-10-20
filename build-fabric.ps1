@@ -381,5 +381,15 @@ try {
     Get-Content "$neDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($neP.ExitCode -ne 0) { throw 'Null element probe FAILED (a null argument entry crashes the hardening logic)' }
     Write-Host 'Null element probe OK' -ForegroundColor Green
+
+    # Negative tests: every probe must be able to FAIL. Each script breaks the
+    # production code on purpose and asserts the matching probe fails. A probe
+    # that cannot fail is decoration, not evidence.
+    # NOTE: these scripts need .tools/jdk21 and the cached libs under
+    # build/fabric/libs - both exist by the time this block runs.
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'src\test\negative\run-all-negative-tests.ps1') 2>&1 |
+        Select-String -Pattern '^\[neg-all\]|NEGATIVE_TESTS_' | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw 'Negative tests FAILED (a probe cannot detect the regression it claims to cover)' }
+    Write-Host 'Negative tests OK' -ForegroundColor Green
 }
 finally { Pop-Location }

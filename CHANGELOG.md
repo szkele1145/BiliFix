@@ -74,8 +74,7 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
-- **参数数组里的 null 元素会让加固逻辑抛 NPE**——`JarToolMixin` 的改写循环里
-  `switch (arg)` 对 null 元素抛
+- **参数数组里的 null 元素会让加固逻辑抛 NPE**——`JarToolMixin` 的改写循环里  `switch (arg)` 对 null 元素抛
   `NullPointerException: Cannot invoke "String.hashCode()"`；
   `isValue(...)` 里的 `s.startsWith("-")` 同样会对 null 抛
   `NullPointerException: Cannot invoke "String.startsWith(String)"`
@@ -89,7 +88,22 @@
     值位置，保留它会让该选项读到 null 值）；`isValue(null)` 返回 false
     而不是抛异常
   - 探针 `src/test/java/NullElementProbe.java`（15 断言）；
-    负向测试 `out/neg-nullelem.ps1`（还原两处防御后 1 通过 / 14 失败）
+    负向测试 `src/test/negative/neg-nullelem.ps1`（还原两处防御后
+    1 通过 / 14 失败，两条不同的 NPE 路径证明两处防御各自独立必要）
+- **负向测试从未进入版本库**——全部 11 个 `out/neg-*.ps1` 一直在
+  gitignore 的 `out/` 里：探针"能失败"的证据只存在于一台机器上，
+  clone 仓库的人无法复现，CI 也不跑
+  - 修复：移入 `src/test/negative/`（受版本控制），新增总控
+    `run-all-negative-tests.ps1`（11 个全部跑，任一失败即构建失败），
+    接入三个构建脚本、`out/ci-faithful.ps1` 与 `.github/workflows/ci.yml`
+  - 顺带修了两个负向测试自身的缺陷：`neg-concurrency.ps1` 与
+    `neg-fmlbridge.ps1` 没有显式 `exit 0`——"探针失败 = 负向测试成功"
+    但脚本把探针的失败码当成了**自己**的退出码（总控会把它们误判为
+    失败）；`neg-fmlbridge.ps1` 的 stub 扫描没排除 slf4j stub
+    （javac 报"找不到 org.slf4j"，与其他脚本同坑）
+  - 踩坑记录：`edit` 工具会剥掉 `.ps1` 的 UTF-8 BOM → WinPS 5.1 按
+    ANSI 读中文路径变乱码（`涓€鍙瘉`）→ 所有含中文路径的脚本编辑后
+    必须重新加 BOM
 - **写错的配置键被静默忽略**——`parse()` 会把配置里的**所有**键放进 map，
   而 `load()` 只读 `hwDecoder` / `vout` / `verbose` 三个，其余**无声丢弃**：
   日志只打印一句"已加载配置"，用户以为自己改的配置生效了

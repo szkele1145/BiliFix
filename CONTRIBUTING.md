@@ -51,6 +51,8 @@ src/test/java/StartupLogTruthProbe.java  # links production classes: the startup
 src/test/java/ForensicsVoutProbe.java    # links production classes: the diagnostics file must not say vout=null
 src/test/java/UnknownConfigKeyProbe.java  # links production classes: a mistyped config key must be visible
 src/test/java/NullElementProbe.java       # links production classes: a null argument entry must not crash the mixin
+src/test/negative/                         # negative tests: every probe must be able to fail
+src/test/negative/run-all-negative-tests.ps1  # runs all of them; any failure fails the build
 src/test/stubs/slf4j/          # a capturing SLF4J provider, so log output can be asserted on
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree

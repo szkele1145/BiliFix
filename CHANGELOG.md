@@ -27,7 +27,28 @@
 - `FmlBridge` 反射查 FML 不可用 → classpath 探测降级（运行时实证
   FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
 
+### 新增
+- **GPU 检测探针**（`src/test/java/GpuDetectProbe.java`，7 断言）：反射调用生产的
+  `EnvironmentDiagnostics.detectGpu()`，要求在 Windows 上返回**非空 GPU 名称**，
+  且不含 `reg` 错误文本 / 无 `\r\n\t` 格式残留、重复调用结果稳定。这是唯一能
+  抓住下面那个父键/子键错误的探针——旧实现的返回值恒为 null，而"非空"这条断言
+  只有在真实 Windows 上跑才有意义（非 Windows 走 skip 分支）
+  三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
+
 ### 修复
+- **GPU 型号从未出现在诊断报告里**（本机实证）——`EnvironmentDiagnostics.detectGpu()`
+  对显示适配器**类 GUID** `{4d36e968-e325-11ce-bfc1-08002be10318}` 执行
+  `reg query ... /v DriverDesc`，但 `DriverDesc` **不在类键上**，而在每块适配器的
+  子键（`0000`、`0001`…）里。父键查询直接失败：
+  `ERROR: The system was unable to find the specified registry key or value.`
+  → `detectGpu()` 恒返回 null，**GPU 行从未出现在报告里**。而 GPU/驱动信息恰恰是
+  原生崩溃排查最需要的一环；连带地，"基础显示驱动"那条警告也从未触发过。
+  修复：改为**逐个子键**查询并汇总（本机实证得到
+  `AMD Radeon RX6500 XT / GameViewer Virtual Display Adapter`）
+  > 排查过程中踩到的坑（已记录以免重犯）：`ProcessBuilder(List<String>)` 的
+  > 第 0 项是**可执行程序本身**。重构时若只放入 `["query", key]`，实际执行的不是
+  > `reg` 而是 `query`，表现为输出 `QUERY { PROCESS | SESSION | TERMSERVER | USER }`
+  > 这条**用法帮助**（退出码 1）——极易误读为"注册表权限问题"
 - `CrashSentinel.record()` 的事件容量控制是"判满 → 丢最旧 → 追加"这组
   check-then-act：底层 `CopyOnWriteArrayList` 每步线程安全，合起来不是。
   `recordHarden` 经 Mixin 在媒体加载线程上被调用，并发进入会让 `MAX_EVENTS`

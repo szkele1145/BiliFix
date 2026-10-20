@@ -150,6 +150,25 @@ if (Test-Path "$root\src\test\java\ReadmeLogSampleProbe.java") {
     Write-Host "README probe OK" -ForegroundColor Green
 }
 
+# GPU detection probe (v1.4.8). The old implementation queried the display
+# adapter CLASS key for DriverDesc, but that value lives in the per-adapter
+# subkeys (0000, 0001, ...) - the class key query fails with
+#   ERROR: The system was unable to find the specified registry key or value.
+# so the GPU line never reached the report. This probe calls the real
+# detectGpu() and requires a non-blank GPU name on Windows.
+if (Test-Path "$root\src\test\java\GpuDetectProbe.java") {
+    $gpuOut = "$OutDir\gpu-probe"
+    New-Item -ItemType Directory -Force -Path $gpuOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$lib\org\slf4j\slf4j-api\2.0.7\slf4j-api-2.0.7.jar" -d $gpuOut "$root\src\test\java\GpuDetectProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "GPU probe compile failed" }
+    $gpuP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$gpuOut;$OutDir\classes;$lib\org\slf4j\slf4j-api\2.0.7\slf4j-api-2.0.7.jar", 'GpuDetectProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$gpuOut\stdout.txt" -RedirectStandardError "$gpuOut\stderr.txt"
+    Get-Content "$gpuOut\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+    if ($gpuP.ExitCode -ne 0) { throw "GPU probe FAILED (detectGpu returned nothing - the GPU line never reaches the report)" }
+    Write-Host "GPU probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

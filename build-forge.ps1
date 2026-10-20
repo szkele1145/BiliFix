@@ -198,5 +198,20 @@ try {
     Get-Content "$rmDir\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
     if ($rmP.ExitCode -ne 0) { throw 'README probe FAILED (README log samples drifted from the production output)' }
     Write-Host 'README probe OK' -ForegroundColor Green
+
+    # GPU detection probe: the old code queried the display adapter CLASS key
+    # for DriverDesc, but that value lives in the per-adapter subkeys, so the
+    # query failed and the GPU line never reached the report.
+    $gpuDir = Join-Path $OutDir 'gpu-probe'
+    New-Item -ItemType Directory -Force -Path $gpuDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp (Join-Path $OutDir 'classes') -d $gpuDir (Join-Path $root 'src\test\java\GpuDetectProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'GPU probe compile failed' }
+    $slf4jForGpu = (Get-ChildItem "$libs\slf4j-api*.jar" | Select-Object -First 1).FullName
+    $gpuP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$gpuDir;$(Join-Path $OutDir 'classes');$slf4jForGpu", 'GpuDetectProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$gpuDir\stdout.txt" -RedirectStandardError "$gpuDir\stderr.txt"
+    Get-Content "$gpuDir\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+    if ($gpuP.ExitCode -ne 0) { throw 'GPU probe FAILED (detectGpu returned nothing - the GPU line never reaches the report)' }
+    Write-Host 'GPU probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

@@ -62,14 +62,74 @@ public final class EnvironmentDiagnostics {
      *
      * <p>实现注意：先在后台线程读完进程输出再 waitFor，避免管道缓冲区满导致
      * 的经典死锁（waitFor 与读流顺序颠倒时可能发生）。</p>
+     *
+     * <p><b>必须逐个子键查询（v1.4.8 修复）</b>：显示适配器类 GUID
+     * {@code {4d36e968-e325-11ce-bfc1-08002be10318}} 本身<b>没有</b>
+     * {@code DriverDesc} 值——该值在每个适配器子键（{@code 0000}、{@code 0001}…）里。
+     * 对父键执行 {@code reg query /v DriverDesc} 会直接失败：
+     * <pre>ERROR: The system was unable to find the specified registry key or value.</pre>
+     * 旧实现因此让 GPU 行<b>永远不出现在诊断报告里</b>（本机实证：父键查询失败，
+     * 逐子键查询得到 "AMD Radeon RX6500 XT"）。而 GPU/驱动信息恰恰是
+     * 原生崩溃排查最需要的一环。</p>
      */
     private static String detectGpu() {
         if (!System.getProperty("os.name", "").toLowerCase().contains("win")) return null;
         try {
-            Process p = new ProcessBuilder("reg", "query",
-                    "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}",
-                    "/v", "DriverDesc").redirectErrorStream(true).start();
-            // 后台线程读流防死锁
+            // 1) 列出适配器子键（reg query <父键> 的输出里，子键是完整的
+            //    HKEY_LOCAL_MACHINE\...\0000 路径；值行以 4 个空格开头）
+            List<String> subKeys = new ArrayList<>();
+            for (String line : regQuery(CLASS_KEY_GUID, null)) {
+                String t = line.trim();
+                if (t.isEmpty()) continue;
+                // 子键路径以 HKEY_ 开头；值行是 "名称    REG_SZ    值"
+                if (!t.regionMatches(true, 0, "HKEY_", 0, 5)) continue;
+                int last = t.lastIndexOf('\\');
+                if (last < 0 || last == t.length() - 1) continue;
+                String sub = t.substring(last + 1);
+                // 只接受形如 0000 的子键（显示适配器实例键）
+                if (sub.length() == 4 && sub.chars().allMatch(Character::isDigit)) {
+                    subKeys.add(sub);
+                }
+            }
+            if (subKeys.isEmpty()) {
+                // 兜底：老系统/异常环境下父键本身可能有值，仍试一次
+                return regQueryValue(CLASS_KEY_GUID, "DriverDesc");
+            }
+            // 2) 逐个子键取 DriverDesc
+            StringBuilder names = new StringBuilder();
+            for (String sub : subKeys) {
+                String desc = regQueryValue(CLASS_KEY_GUID + "\\" + sub, "DriverDesc");
+                if (desc == null || desc.isEmpty()) continue;
+                if (names.length() > 0) names.append(" / ");
+                names.append(desc);
+            }
+            return names.length() == 0 ? null : names.toString();
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    /** 显示适配器类 GUID（其下每个子键对应一块适配器） */
+    private static final String CLASS_KEY_GUID =
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}";
+
+    /**
+     * 执行 reg query 并返回输出行；{@code valueName} 为 null 时只列出子键。
+     * 失败/超时/非 Windows 一律返回空结果——诊断永不影响游戏。
+     */
+    private static List<String> regQuery(String key, String valueName) {
+        List<String> out = new ArrayList<>();
+        try {
+            List<String> args = new ArrayList<>();
+            args.add("reg");          // 可执行程序（ProcessBuilder(List) 的第 0 项是命令本身）
+            args.add("query");
+            args.add(key);
+            if (valueName != null) {
+                args.add("/v");
+                args.add(valueName);
+            }
+            Process p = new ProcessBuilder(args).redirectErrorStream(true).start();
+            // 后台线程读流防死锁（管道缓冲区满时 waitFor 会与读流互相等待）
             var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
             var lines = new java.util.ArrayList<String>();
             var t = new Thread(() -> {
@@ -84,17 +144,29 @@ public final class EnvironmentDiagnostics {
             // 3 秒超时保护
             if (!p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
                 p.destroyForcibly();
-                return null;
+                return out;
             }
             t.join(500);
-            for (String line : lines) {
-                if (line.contains("DriverDesc") && line.contains("REG_SZ")) {
-                    int i = line.indexOf("REG_SZ");
-                    String name = line.substring(i + 6).trim();
-                    if (!name.isEmpty()) return name;
-                }
-            }
+            for (String line : lines) out.add(line);
         } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
+    /**
+     * 读取某个注册表键下的字符串值（REG_SZ / REG_EXPAND_SZ）。
+     *
+     * <p>解析 {@code reg query} 的输出格式：{@code <name>    REG_SZ    <value>}。
+     * 注意值本身可能含空格，故按 REG_SZ 之后的第一个分隔符切分再 trim。</p>
+     */
+    private static String regQueryValue(String key, String valueName) {
+        for (String line : regQuery(key, valueName)) {
+            if (!line.contains(valueName)) continue;
+            int i = line.indexOf("REG_SZ");
+            if (i < 0) continue;
+            String value = line.substring(i + "REG_SZ".length()).trim();
+            // reg 对 REG_SZ 输出 "    <value>"，去掉前导分隔空格即可
+            if (!value.isEmpty()) return value;
         }
         return null;
     }

@@ -28,6 +28,9 @@
   FabricInitProbe：`RESULT=done`，lock/config 落盘正确）
 
 ### 新增
+- **取证抑制探针**（`src/test/java/ForensicsSuppressionProbe.java`，9 断言）：验证启动自检
+  的取证抑制**不跨线程泄漏**（详见下方修复项）。**已接入三个构建脚本**
+  - **负向测试实证**（`out/neg-forensics.ps1`）：回退到全局布尔 → 4 条断言失败
 - **参数改写探针**（`src/test/java/ArgumentRewriteProbe.java`，76 断言）：**整个修复的核心
   ——`JarToolMixin` 的参数改写逻辑此前从未被真正执行过**。`Regression` 是独立镜像
   （抓不到生产代码自身的错），`ReadmeLogSampleProbe` 只比对日志**字符串**。本探针
@@ -48,6 +51,18 @@
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
 ### 修复
+- **取证抑制跨线程泄漏，真实播放被静默吞掉**——启动自检
+  （`MixinTargetGuard.functionalProbe`）会真的调用一次 `JarTool.readArray`，
+  为此用 `CrashSentinel.setForensicsSuppressed(true)` 抑制取证计数，避免把
+  "用户根本没播放媒体"记成 `media touched: yes`。
+  但该开关原是**全局静态布尔**：
+  - 自检跑在**启动线程**，真实播放跑在**媒体加载线程**。自检期间发生的真实播放
+    会被一并抑制 → `mediaTouched` 仍是 false、计数不加 → **这次真实播放彻底不被记录**
+  - 这与它要防止的"取证污染"是同一种错误的镜像：把"该记的"丢掉，同样让取证结论不可信
+  - 修复：改为 `ThreadLocal<Boolean>`，抑制只作用于发起自检的线程
+  - 探针实证（修复前）：`[FAIL] B 线程的真实播放未被 A 的抑制吞掉（mediaTouched 被置位）`
+    `[FAIL] 抑制标志是线程局部的（ThreadLocal 或计数器），不是全局布尔`
+    （实际类型 `java.lang.Boolean`）；修复后 B 线程 `mediaTouched = true, 计数 = 1`
 - **GPU 型号从未出现在诊断报告里**（本机实证）——`EnvironmentDiagnostics.detectGpu()`
   对显示适配器**类 GUID** `{4d36e968-e325-11ce-bfc1-08002be10318}` 执行
   `reg query ... /v DriverDesc`，但 `DriverDesc` **不在类键上**，而在每块适配器的

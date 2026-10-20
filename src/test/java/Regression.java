@@ -552,7 +552,14 @@ public class Regression {
                             s.contains("setForensicsSuppressed(boolean"));
                     check("取证: recordHarden 在抑制态下直接返回",
                             s.matches("(?s).*public\\s+static\\s+void\\s+recordHarden\\s*\\(.*?"
-                                    + "\\)\\s*\\{\\s*if\\s*\\(\\s*suppressForensics\\s*\\)\\s*return;.*"));
+                                    + "\\)\\s*\\{\\s*if\\s*\\(.*?SUPPRESS_FORENSICS.*?\\)\\s*return;.*"));
+                    // v1.4.8：抑制必须是**线程局部**的。若是全局布尔，自检期间
+                    // 媒体线程上的真实播放会被一并吞掉——mediaTouched 仍是 false、
+                    // 计数不加，这次真实播放彻底不被记录。与"污染"是同一种错误的
+                    // 镜像：把"该记的"丢掉同样让取证结论不可信。
+                    check("取证: 抑制开关是线程局部的（ThreadLocal），不跨线程泄漏",
+                            s.contains("ThreadLocal<Boolean> SUPPRESS_FORENSICS")
+                                    && !s.contains("volatile boolean SUPPRESS_FORENSICS"));
                 } else {
                     skip("取证: CrashSentinel.java 缺失，跳过源码断言");
                 }

@@ -275,5 +275,19 @@ try {
         if ($arP.ExitCode -ne 0) { throw 'Argument rewrite probe FAILED (the hardening logic did not behave as required)' }
         Write-Host 'Argument rewrite probe OK' -ForegroundColor Green
     }
+
+    # Forensics suppression probe: the startup self-check's suppression must be
+    # thread-local, otherwise a real media playback on the media thread is
+    # swallowed too and the forensic evidence is lost.
+    $fsDir = Join-Path $OutDir 'forensics-probe'
+    New-Item -ItemType Directory -Force -Path $fsDir | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$outClasses;$slf4jForGpu" -d $fsDir (Join-Path $root 'src\test\java\ForensicsSuppressionProbe.java')
+    if ($LASTEXITCODE -ne 0) { throw 'Forensics suppression probe compile failed' }
+    $fsP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$fsDir;$outClasses;$slf4jForGpu", 'ForensicsSuppressionProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$fsDir\stdout.txt" -RedirectStandardError "$fsDir\stderr.txt"
+    Get-Content "$fsDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($fsP.ExitCode -ne 0) { throw 'Forensics suppression probe FAILED (the suppression leaks across threads)' }
+    Write-Host 'Forensics suppression probe OK' -ForegroundColor Green
 }
 finally { Pop-Location }

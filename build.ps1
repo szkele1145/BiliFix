@@ -189,6 +189,24 @@ if ((Test-Path "$root\src\test\java\ArgumentRewriteProbe.java") -and (Test-Path 
     Write-Host "Argument rewrite probe OK" -ForegroundColor Green
 }
 
+# Forensics suppression probe (v1.4.8). The startup self-check suppresses the
+# forensic counters so it does not fake a "media touched" signal. That
+# suppression must be THREAD-LOCAL: a global flag would also swallow a real
+# media playback happening on the media thread at the same time, losing the
+# very evidence the diagnostic file exists to provide.
+if (Test-Path "$root\src\test\java\ForensicsSuppressionProbe.java") {
+    $fsOut = "$OutDir\forensics-probe"
+    New-Item -ItemType Directory -Force -Path $fsOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $fsOut "$root\src\test\java\ForensicsSuppressionProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Forensics suppression probe compile failed" }
+    $fsP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$fsOut;$OutDir\classes;$slf4jJar", 'ForensicsSuppressionProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$fsOut\stdout.txt" -RedirectStandardError "$fsOut\stderr.txt"
+    Get-Content "$fsOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($fsP.ExitCode -ne 0) { throw "Forensics suppression probe FAILED (the suppression leaks across threads)" }
+    Write-Host "Forensics suppression probe OK" -ForegroundColor Green
+}
+
 # Package
 # NOTE: no timestamp post-processing - patching entry times via ZipArchive Update mode
 # corrupted the jar (DOS timestamp epoch boundary at 1980-01-01 produced an invalid

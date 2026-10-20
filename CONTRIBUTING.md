@@ -44,6 +44,7 @@ src/test/java/FmlBridgeProbe.java         # links production classes: FML reflec
 src/test/java/ReadmeLogSampleProbe.java   # README log samples vs production strings
 src/test/java/GpuDetectProbe.java         # links production classes: GPU detection really works
 src/test/java/ArgumentRewriteProbe.java   # links production classes: the hardening logic itself
+src/test/java/ForensicsSuppressionProbe.java  # links production classes: suppression must not leak across threads
 src/test/stubs/               # stub FML classes under the REAL package names
 src/test/stubs/ci/            # minimal FML stub so CI can compile the production tree
 build.ps1          # build + test + package + integrity gate (NeoForge 1.21.1)
@@ -60,7 +61,7 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe` | **Yes** | The production code actually behaves as intended |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes
@@ -79,6 +80,10 @@ link the real classes and exercise them:
   requires a non-blank GPU name on Windows. The class key `{4d36e968-...}` has
   no `DriverDesc` of its own - it lives in the per-adapter subkeys - so the
   class-key query fails and the GPU line never reaches the report.
+- `ForensicsSuppressionProbe` - the startup self-check suppresses the forensic
+  counters so it does not fake a "media touched" signal. That suppression must
+  be thread-local: a global flag also swallows a real playback happening on the
+  media thread, losing the evidence the diagnostic file exists to provide.
 - `ArgumentRewriteProbe` - calls the real `JarToolMixin` rewriting method with
   a real `CallbackInfoReturnable`. This is the core of the fix, and until this
   probe existed **nothing ever executed it**: the mirror cannot catch a bug in

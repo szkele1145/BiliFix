@@ -73,16 +73,26 @@ public final class CrashSentinel {
      * {@code media touched: yes}——直接摧毁 v1.4.7 建立的核心取证语义
      * （"media touched 用于区分『真播放过媒体』与『只是开着游戏』"）。
      * 崩溃排查时这个字段一旦撒谎，结论就不可信了。</p>
+     *
+     * <p><b>为什么是线程局部而不是全局布尔</b>（v1.4.8 修复）：自检在<b>启动线程</b>
+     * 上跑，而真实的媒体播放在<b>媒体加载线程</b>上。若抑制是全局的，自检期间
+     * 媒体的真实播放会被一并吞掉——{@code mediaTouched} 仍是 false、计数不加，
+     * 这次真实播放<b>彻底不被记录</b>。这与上面要防止的"污染"是同一种错误的
+     * 镜像：把"该记的"丢掉同样会让取证结论不可信。改成
+     * {@link ThreadLocal} 后，抑制只作用于发起自检的那个线程。</p>
      */
-    private static volatile boolean suppressForensics = false;
+    private static final ThreadLocal<Boolean> SUPPRESS_FORENSICS = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     /**
      * 设置取证抑制（自检类调用必须成对使用 try/finally 复位）。
      *
-     * @param suppress true = 抑制取证计数与 mediaTouched
+     * <p><b>只影响调用线程</b>：其他线程（尤其是媒体加载线程）的真实播放
+     * 照常记录。</p>
+     *
+     * @param suppress true = 抑制本线程的取证计数与 mediaTouched
      */
     public static void setForensicsSuppressed(boolean suppress) {
-        suppressForensics = suppress;
+        SUPPRESS_FORENSICS.set(suppress);
     }
 
     /** 生命周期事件（容量截断，防长会话内存增长） */
@@ -118,7 +128,7 @@ public final class CrashSentinel {
 
     /** 记录一次 Mixin 参数加固（fullArgs 非空时附带完整参数序列） */
     public static void recordHarden(int originalCount, int newCount, String fullArgs) {
-        if (suppressForensics) return;   // 自检调用：不污染取证数据（见 suppressForensics javadoc）
+        if (Boolean.TRUE.equals(SUPPRESS_FORENSICS.get())) return;   // 自检调用：不污染取证数据（见 SUPPRESS_FORENSICS javadoc）
         HARDEN_COUNT.incrementAndGet();
         mediaTouched = true;
         String event = "VLC args hardened: " + originalCount + " -> " + newCount + " items"

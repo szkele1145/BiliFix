@@ -155,6 +155,24 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **CI 现在会检查"编码卫生"**（`6aba884`）：所有含非 ASCII 字符的 `.ps1`
+  **必须带 UTF-8 BOM**，且所有 `.ps1` **必须能解析**
+  - 原因：WinPS 5.1 读无 BOM 的 `.ps1` 会按 ANSI 读 → 中文乱码 →
+    乱码里的引号变成**语法错误**，报的是
+    `Array index expression is missing or not valid`，**完全看不出真因**
+    （这个坑在本项目踩了三次，每次都是工具重写文件之后）
+  - 所以这条规矩现在**由 CI 检查**，而不是靠人记得
+  - **能失败**：植入一个缺 BOM 的脚本 → `ENCODING_FAILURES=1` → EXIT=1；
+    删掉后恢复全绿
+- **standalone 守卫本身先修好了两个 bug**（`6aba884`）：
+  1. 它用 `& powershell ... 2>&1` 启动子进程——在 `$ErrorActionPreference='Stop'`
+     下，子进程写 stderr 会变成**终止性错误**，循环会在**第一个**坏脚本处死掉，
+     **一个名字都报不出来**。改成 `Start-Process` + 文件重定向
+  2. 自测把坏脚本**植入真实仓库**——中途崩了就留下垃圾文件。改为植入临时目录，
+     守卫新增 `-ExtraDir` 参数
+  - 另外：`param` 块必须是脚本的**第一个语句**（放在 `$ErrorActionPreference`
+    之后会被当成命令：`param : The term 'param' is not recognized`）
+  - 自测现在还额外断言守卫**点名**了坏脚本，而不只是"失败了"
 - **有 4 条负向测试"批量能跑、单独必崩"**（`f33918` 之后）：
   - `neg-cfgdefault` / `neg-fmlmodver` / `neg-nullelem` / `neg-unknownkey` 用了
     `$repo` / `$jdk` 却**没有定义**

@@ -163,7 +163,7 @@ public class Regression {
         // ============ 9.6. jar 包结构：必须包含类、mixin 清单、mods.toml、logo ============
         // v1.4.8：不再硬编码 jar 文件名（此前写死 1.4.7，bump 后 jar 名变了就静默 SKIP，
         // 检查形同虚设）。改为扫描 build/ 下该 loader 的最新产物。
-        Path neoJar = pickJar("BiliFix-", "-mc1.21.1-neoforge.jar");
+        Path neoJar = pickJar("BiliFix-", "mc1.21.1-neoforge.jar");
         if (neoJar != null) {
             try (JarFile jf = new JarFile(neoJar.toFile())) {
                 check("jar: 含 bilifix/BiliFixMod.class",
@@ -186,10 +186,10 @@ public class Regression {
         // 引导期抛 IllegalArgumentException 直接炸加载。若构建脚本的暂存改写被
         // git checkout 等操作静默丢失，这里必须 FAIL 而不是 SKIP。
         for (String[] variant : new String[][]{
-                {"-mc1.20.1-forge.jar",  "MANIFEST MixinConfigs"},
-                {"-mc1.20.1-fabric.jar", "fabric.mod.json entrypoint"}}) {
+                {"mc1.20.1-forge.jar",  "MANIFEST MixinConfigs"},
+                {"mc1.20.1-fabric.jar", "fabric.mod.json entrypoint"}}) {
             Path vjar = pickJar("BiliFix-", variant[0]);
-            if (vjar == null) { skip("jar: BiliFix-" + SOURCE_VERSION + variant[0] + " 未构建，跳过"); continue; }
+            if (vjar == null) { skip("jar: BiliFix-" + SOURCE_VERSION + "-" + variant[0] + " 未构建，跳过"); continue; }
             try (JarFile jf = new JarFile(vjar.toFile())) {
                 String nm = vjar.getFileName().toString();
                 check("jar: " + nm + " 含 JarToolMixin.class",
@@ -198,16 +198,26 @@ public class Regression {
                         jf.getJarEntry("bilifix.mixins.json") != null);
                 // in-jar mixins.json 必须是 JAVA_17 且无 JAVA_21 残留（防暂存改写回归）
                 var me = jf.getJarEntry("bilifix.mixins.json");
-                String mtxt = new String(jf.getInputStream(me).readAllBytes(), StandardCharsets.UTF_8);
-                check("jar: " + nm + " mixins.json JAVA_17 改写生效",
-                        mtxt.contains("\"JAVA_17\"") && !mtxt.contains("JAVA_21"));
-                if ("-mc1.20.1-fabric.jar".equals(variant[0])) {
-                    check("jar: " + nm + " 含 fabric.mod.json 且 entrypoint 声明正确",
-                            jf.getJarEntry("fabric.mod.json") != null);
+                if (me == null) {
+                    // 不能直接 getInputStream(null)：那会抛 NPE 把整个 Regression
+                    // 打死，而"条目缺失"恰恰是本段要检测的失败情形——它必须
+                    // 记一条 FAIL 然后继续，不是崩掉。
+                    check("jar: " + nm + " 含 bilifix.mixins.json", false);
+                } else {
+                    String mtxt = new String(jf.getInputStream(me).readAllBytes(), StandardCharsets.UTF_8);
+                    check("jar: " + nm + " mixins.json JAVA_17 改写生效",
+                            mtxt.contains("\"JAVA_17\"") && !mtxt.contains("JAVA_21"));
+                }
+                if ("mc1.20.1-fabric.jar".equals(variant[0])) {
                     var fe = jf.getJarEntry("fabric.mod.json");
-                    String ftxt = new String(jf.getInputStream(fe).readAllBytes(), StandardCharsets.UTF_8);
-                    check("jar: " + nm + " entrypoint = BiliFixFabric",
-                            ftxt.contains("dev.polaris_fix.bilifix.fabric.BiliFixFabric"));
+                    check("jar: " + nm + " 含 fabric.mod.json 且 entrypoint 声明正确", fe != null);
+                    if (fe != null) {
+                        String ftxt = new String(jf.getInputStream(fe).readAllBytes(), StandardCharsets.UTF_8);
+                        check("jar: " + nm + " entrypoint = BiliFixFabric",
+                                ftxt.contains("dev.polaris_fix.bilifix.fabric.BiliFixFabric"));
+                    } else {
+                        check("jar: " + nm + " entrypoint = BiliFixFabric", false);
+                    }
                     check("jar: " + nm + " 含 BiliFixFabric.class（entrypoint 可加载）",
                             jf.getJarEntry("dev/polaris_fix/bilifix/fabric/BiliFixFabric.class") != null);
                 } else {
@@ -243,6 +253,44 @@ public class Regression {
                     }
                 }
             }
+        }
+
+        // ============ 9.6c. jar 选择的两个健壮性断言（2026-10-21 实证） ============
+        // 缺陷 1：pickJar 过去取"修改时间最新"的匹配 jar。build/ 下会残留上一个
+        //   版本的产物（housekeeping 在打包之后才跑，而 Regression 在打包之前跑），
+        //   于是"最新"可能是个旧 jar 或一个手工造的假 jar——本段曾用
+        //   BiliFix-1.4.0-mc1.20.1-fabric.jar（其实是 forge jar 改名）触发
+        //   getInputStream(null) 的 NPE，整个 Regression 被打死。
+        // 缺陷 2：读 jar 条目前不判空。"条目缺失"恰恰是本段要检测的失败情形，
+        //   它必须记一条 FAIL 然后继续，而不是崩掉。
+        Path fabricJar = pickJar("BiliFix-", "mc1.20.1-fabric.jar");
+        if (fabricJar != null) {
+            // (a) pickJar 选中的必须是**当前版本**的 jar
+            check("jar: pickJar 只返回当前版本的 jar（选中 " + fabricJar.getFileName() + "）",
+                    fabricJar.getFileName().toString().startsWith("BiliFix-" + SOURCE_VERSION + "-"));
+            // (b) 读条目前必须判空：缺失要记 FAIL，不能 NPE 打死整个套件
+            boolean entryMissing = false;
+            boolean threw = false;
+            try (JarFile jf = new JarFile(fabricJar.toFile())) {
+                var fe = jf.getJarEntry("fabric.mod.json");
+                if (fe == null) {
+                    entryMissing = true;
+                } else {
+                    String ftxt = new String(jf.getInputStream(fe).readAllBytes(), StandardCharsets.UTF_8);
+                    check("jar: " + fabricJar.getFileName() + " entrypoint = BiliFixFabric",
+                            ftxt.contains("dev.polaris_fix.bilifix.fabric.BiliFixFabric"));
+                }
+            } catch (Exception ex) {
+                threw = true;
+            }
+            check("jar: 读 jar 条目不抛异常（缺失条目记 FAIL 而不是 NPE）", !threw);
+            if (entryMissing) {
+                // 选中的 jar 名字说自己是 fabric 变体，里面却没有 fabric.mod.json
+                // ——这正是"假 jar"的情形，必须 FAIL
+                check("jar: " + fabricJar.getFileName() + " 含 fabric.mod.json", false);
+            }
+        } else {
+            skip("jar: fabric 变体未构建，跳过 jar 选择健壮性检查");
         }
 
         // ============ 9.7. mods.toml 结构：modId、version、[[mixins]] 三要素 ============
@@ -880,6 +928,18 @@ public class Regression {
      * 此前 jar 名硬编码版本号，bump 之后路径失效、检查被静默 SKIP，
      * 等于打包结构失去守卫。改为按"前缀 + loader 后缀"扫描并取最新修改的一个。
      */
+    /**
+     * 找出 build/ 下当前版本、属于指定 loader 的 jar。
+     *
+     * <p><b>为什么必须锁定版本</b>：本方法过去取"修改时间最新"的匹配 jar。
+     * build/ 下会残留上一个版本的产物（housekeeping 在打包之后才跑，而
+     * Regression 在打包之前跑），于是"最新"可能是个旧 jar——2026-10-21
+     * 实证：手工造的 {@code BiliFix-1.4.0-mc1.20.1-fabric.jar} 被选中，
+     * 接着 {@code getInputStream(null)} 抛 NPE 把整个 Regression 打死。
+     * 查旧 jar 没有意义：本段断言的是**当前代码**的产物。
+     *
+     * @param suffix jar 名的后半段，如 {@code -mc1.21.1-neoforge.jar}
+     */
     static Path pickJar(String prefix, String suffix) {
         try {
             for (Path dir : List.of(Paths.get("build"), Paths.get("build", "forge"),
@@ -889,7 +949,8 @@ public class Regression {
                     Path best = s.filter(Files::isRegularFile)
                             .filter(p -> {
                                 String n = p.getFileName().toString();
-                                return n.startsWith(prefix) && n.endsWith(suffix);
+                                return n.startsWith(prefix + SOURCE_VERSION + "-")
+                                        && n.endsWith(suffix);
                             })
                             .max(Comparator.comparingLong(p -> p.toFile().lastModified()))
                             .orElse(null);

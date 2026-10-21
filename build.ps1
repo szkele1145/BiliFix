@@ -490,6 +490,26 @@ $zc.Dispose()
 if ($failCount -gt 0) { throw "jar integrity check FAILED: $failCount of $total entries corrupt" }
 Write-Host "Jar integrity: $total/$total entries OK" -ForegroundColor Green
 
+
+# Housekeeping: remove OLDER-VERSION jars from build/ (all published versions
+# are recoverable from source).
+# This must run BEFORE the jar metadata probe, and it must cover every output
+# directory - the probe scans build/ recursively, so a stale jar left in
+# build/forge/ or build/fabric/ would be checked as if it were a current
+# artefact. (It was: BiliFix-1.4.7-mc1.20.1-forge.jar sat in build/forge/
+# for weeks because this only ever cleaned build/ root.)
+#
+# Only jars whose version differs from the one being built are removed: the
+# three variants share the build/ tree, and deleting the OTHER variants'
+# current jars would mean "build the fabric variant" silently destroys the
+# neoforge artefact.
+$hkVersion = (Split-Path $jarOut -Leaf) -replace '^BiliFix-([^-]+)-.*$', '$1'
+foreach ($hkDir in @((Join-Path $root 'build'), (Join-Path $root 'build\forge'), (Join-Path $root 'build\fabric'))) {
+    if (-not (Test-Path $hkDir)) { continue }
+    Get-ChildItem $hkDir -Filter 'BiliFix-*-mc*.jar' -ErrorAction SilentlyContinue |
+        Where-Object { ($_.Name -replace '^BiliFix-([^-]+)-.*$', '$1') -ne $hkVersion } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+}
     # Jar metadata probe: check the PACKAGED artefact, not the source.
     # Which loader metadata file is inside, what the mixin
     # compatibilityLevel says and whether the mod classes are present are
@@ -527,5 +547,3 @@ Write-Host "Jar integrity: $total/$total entries OK" -ForegroundColor Green
             }
     }
 Write-Host "Packaged: $jarOut ($((Get-Item $jarOut).Length) bytes)" -ForegroundColor Green
-# Housekeeping: remove older-version jars from build/ (all published versions are recoverable from source)
-Get-ChildItem "$OutDir" -Filter 'BiliFix-*-mc*.jar' | Where-Object { $_.Name -ne (Split-Path $jarOut -Leaf) } | Remove-Item -Force -ErrorAction SilentlyContinue

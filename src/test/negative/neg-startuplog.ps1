@@ -7,7 +7,7 @@
 # PowerShell 5.1 reads it as ANSI).
 $d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
 . (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
-$jdkBin = Resolve-JdkBin
+$jdkBin = Resolve-JdkBin -RepoRoot $d
 if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
 $javac = Join-Path $jdkBin 'javac.exe'
 $java  = Join-Path $jdkBin 'java.exe'
@@ -28,8 +28,6 @@ $java  = Join-Path $jdkBin 'java.exe'
 # "hw=AUTO" while the effective value is "any" (VLC picks the hardware
 # decoder - the very tier that causes the crash).
 
-$javac = Join-Path $jdkBin 'javac.exe'
-$java  = Join-Path $jdkBin 'java.exe'
 $cp = "$d\build\fabric\libs\slf4j-api-2.0.7.jar;$d\build\fabric\libs\mixin-0.8.5.jar"
 $tmp = Join-Path $env:TEMP 'startup-neg'
 # SAFETY: only ever delete a directory that is inside %TEMP% and carries

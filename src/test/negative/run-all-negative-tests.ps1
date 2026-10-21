@@ -13,21 +13,14 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 Set-Location $repo
 
-# JDK resolution: the project's own toolchain first, then JAVA_HOME.
-# The CI runner has a complete JDK in JAVA_HOME (setup-java) but no
-# .tools/jdk21 - the project toolchain is git-ignored. Copying just
-# java.exe + javac.exe into .tools/jdk21 does NOT work: JDK 21 is modular,
-# so javac.exe needs the jdk.compiler module from lib/ and dies with
-# "Module jdk.compiler not found".
-$jdkBin = Join-Path $repo '.tools\jdk21\bin'
-if (-not (Test-Path (Join-Path $jdkBin 'java.exe'))) {
-    if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
-        $jdkBin = Join-Path $env:JAVA_HOME 'bin'
-        Write-Host ("[neg-all] 用 JAVA_HOME 的 JDK: " + $jdkBin)
-    } else {
-        Write-Host "[neg-all] 缺少 JDK：既没有 .tools\jdk21\bin\java.exe，也没有 JAVA_HOME"
-        exit 1
-    }
+# JDK resolution: shared helper (the project's own toolchain first, then
+# JAVA_HOME). See src/test/negative/jdk.ps1 for why copying just java.exe +
+# javac.exe into .tools/jdk21 does not work on a modular JDK 21.
+. (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
+$jdkBin = Resolve-JdkBin -RepoRoot $repo
+if (-not $jdkBin) {
+    Write-Host "[neg-all] 缺少 JDK：既没有 .tools\jdk21\bin\javac.exe，也没有 JAVA_HOME"
+    exit 1
 }
 $javaExe = Join-Path $jdkBin 'java.exe'
 if (-not (Test-Path $javaExe)) { Write-Host "[neg-all] 缺少 JDK: $javaExe"; exit 1 }
@@ -136,5 +129,29 @@ if ($failed.Count -gt 0) {
     Write-Host "NEGATIVE_TESTS_HAVE_FAILURES"
     exit 1
 }
+
+# STANDALONE CHECK
+#
+# Every negative test must also work on its own, because that is what a
+# human does when a test breaks: run that one script. PowerShell's & call
+# runs a script in a child scope that can still SEE the caller's variables,
+# so a script that used $repo or $jdk without defining them passed inside
+# this batch and failed on its own - four scripts were in that state.
+#
+# The check starts the scripts from a directory that is NOT the repository
+# root, so a script that secretly depends on the current directory is caught
+# too.
+Write-Host ""
+Write-Host "[neg-all] 检查每条负向测试能否单独运行"
+$standaloneOut = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'src\test\negative\check-standalone.ps1') 2>&1
+$standaloneCode = $LASTEXITCODE
+$standaloneOut | Select-String -Pattern '单独可跑的脚本数|NEGATIVE_TESTS_ALL_STANDALONE|NEGATIVE_TESTS_NOT_STANDALONE' |
+    ForEach-Object { Write-Host ("  " + $_.ToString().Trim()) }
+if ($standaloneCode -ne 0) {
+    $standaloneOut | Select-String -Pattern '^\s+FAIL' | ForEach-Object { Write-Host ("  " + $_.ToString().Trim()) }
+    Write-Host "NEGATIVE_TESTS_HAVE_FAILURES"
+    exit 1
+}
+
 Write-Host "NEGATIVE_TESTS_ALL_OK"
 exit 0

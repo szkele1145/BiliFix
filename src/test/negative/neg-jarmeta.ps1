@@ -7,7 +7,7 @@
 # PowerShell 5.1 reads it as ANSI).
 $d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
 . (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
-$jdkBin = Resolve-JdkBin
+$jdkBin = Resolve-JdkBin -RepoRoot $d
 if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
 $javac = Join-Path $jdkBin 'javac.exe'
 $java  = Join-Path $jdkBin 'java.exe'
@@ -27,8 +27,6 @@ $java  = Join-Path $jdkBin 'java.exe'
 #            1.20.1 runtime mixin does not have (JAVA_21), which blows up
 #            in the mixin bootstrap phase.
 
-$javac = Join-Path $jdkBin 'javac.exe'
-$java  = Join-Path $jdkBin 'java.exe'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 $tmp = Join-Path $env:TEMP ('bilifix-neg-jarmeta-' + [guid]::NewGuid().ToString('N').Substring(0,8))

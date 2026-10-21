@@ -7,7 +7,7 @@
 # PowerShell 5.1 reads it as ANSI).
 $d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
 . (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
-$jdkBin = Resolve-JdkBin
+$jdkBin = Resolve-JdkBin -RepoRoot $d
 if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
 $javac = Join-Path $jdkBin 'javac.exe'
 $java  = Join-Path $jdkBin 'java.exe'
@@ -18,8 +18,6 @@ $java  = Join-Path $jdkBin 'java.exe'
 # The probe's "三步链路" assertions must then FAIL - proving they actually guard
 # the real production code, not a mirrored copy of it.
 
-$javac = Join-Path $jdkBin 'javac.exe'
-$java  = Join-Path $jdkBin 'java.exe'
 $tmp = Join-Path $env:TEMP 'fmlbridge-neg2'
 # SAFETY: only ever delete a directory that is inside %TEMP% and carries
 # our own prefix. A mis-resolved $tmp must never be able to delete

@@ -273,7 +273,47 @@ Push-Location $root
 if ($LASTEXITCODE -ne 0) { $negFailed++ }
 Pop-Location
 Write-Host ("  NEGATIVE_TESTS_FAILED=" + $negFailed)
-if ($negFailed -eq 0 -and $failed -eq 0 -and $regExit -eq 0 -and $prodExit -eq 0) {
+
+# --- step: encoding hygiene ---
+# Every .ps1 in this repository that contains non-ASCII text must carry a
+# UTF-8 BOM.
+#
+# Why: Windows PowerShell 5.1 reads a BOM-less .ps1 as ANSI (the machine's
+# code page), so Chinese text - and any non-ASCII path derived from the
+# script's own location - turns into mojibake. That does not always fail
+# loudly: a mojibake quote character inside a string is a PARSE error, so
+# the script dies with a confusing "Array index expression is missing or
+# not valid" instead of saying "your file lost its BOM". It has happened
+# three times in this project, always after a tool rewrote a file.
+#
+# So the rule is checked here, in CI, rather than remembered.
+$encFailed = 0
+$encScanned = 0
+$encScripts = Get-ChildItem $root -Recurse -Filter '*.ps1' -File |
+    Where-Object { $_.FullName -notmatch '\\(\.git|build|out|\.tools|node_modules)\\' }
+foreach ($f in $encScripts) {
+    $encScanned++
+    $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+    $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191)
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    if ($hasBom) { $text = $text.Substring(1) }
+    $nonAscii = @($text.ToCharArray() | Where-Object { [int]$_ -gt 127 }).Count -gt 0
+    if ($nonAscii -and -not $hasBom) {
+        $encFailed++
+        Write-Host ("  [ENC] 缺少 UTF-8 BOM（Windows PowerShell 5.1 会按 ANSI 读，中文会乱码）: " + $f.FullName.Replace("$root\", ''))
+    }
+    # and it must parse
+    $parseErr = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$parseErr) | Out-Null
+    if ($parseErr.Count -gt 0) {
+        $encFailed++
+        Write-Host ("  [ENC] 语法错误 行 " + $parseErr[0].Extent.StartLineNumber + ": " + $parseErr[0].Message + "  -> " + $f.FullName.Replace("$root\", ''))
+    }
+}
+Write-Host ("  ENCODING_SCRIPTS_SCANNED=" + $encScanned)
+Write-Host ("  ENCODING_FAILURES=" + $encFailed)
+
+if ($negFailed -eq 0 -and $failed -eq 0 -and $regExit -eq 0 -and $prodExit -eq 0 -and $encFailed -eq 0) {
     Write-Host "FAITHFUL_CI_SIM_WITH_NEG=ALL_GREEN"
 } else {
     Write-Host "FAITHFUL_CI_SIM_WITH_NEG=HAS_FAILURES"
@@ -281,4 +321,4 @@ if ($negFailed -eq 0 -and $failed -eq 0 -and $regExit -eq 0 -and $prodExit -eq 0
 
 Set-Location $root
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-if ($regExit -ne 0 -or $prodExit -ne 0 -or $failed -gt 0 -or $negFailed -gt 0) { exit 1 }
+if ($regExit -ne 0 -or $prodExit -ne 0 -or $failed -gt 0 -or $negFailed -gt 0 -or $encFailed -gt 0) { exit 1 }

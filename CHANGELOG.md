@@ -73,10 +73,33 @@
   只有在真实 Windows 上跑才有意义（非 Windows 走 skip 分支）
   三个构建脚本（`build.ps1` / `build-forge.ps1` / `build-fabric.ps1`）均已接入
 
-### 修
-
-复
+### 修复
 - **没设的配置项被当成了"被归一化过"**——`strategyWasNormalized()` 决定要不要
+
+- **修复的支点从未对照过真实的 watermedia**（新增证据层级）：整个修复只有一个
+  Mixin 注入点（`JarTool#readArray`），但此前**所有**关于它的断言都基于
+  **手写的假数据**——手写数据只能证明"改写逻辑对手写数据成立"，证明不了
+  "对 watermedia 真的给的那份参数表成立"。而整个修复的价值全押在这份表上。
+  - **实测真实 jar**（2026-10-21，`javap` + zip 读取，watermedia 2.1.36 与 2.1.37）：
+    - 真实签名：`public static java.lang.String[] readArray(java.lang.String) throws IOException`
+      —— 与 Mixin 目标**完全一致**（静态、返回 `String[]`、单 `String` 参数）
+    - `PlayerAPI` 的字节码里是 `invokestatic JarTool.readArray` → `registerFactory`，
+      **没有** `readArrayAndParse` —— 我们打的正是实际被调用的那个方法
+    - `readArray` 只把参数当**资源名**读进 `Gson` 解析，改返回值是正确切入点
+    - 真实 `videolan/arguments.json` 里确实有
+      `"--vout", "direct3d11,glwin32,gl,any"` 与
+      `"--avcodec-hw", "d3d11va,dxva2,any"` —— **这就是根因本身**
+    - 真实 `videolan/arguments_linux.json` **根本没有** `--vout` / `--avcodec-hw`
+      —— 这正是 mixin 里"没有就主动追加"分支存在的理由
+  - 新增 `RealArgumentsProbe`（24 断言）：把**真实参数表**当装置，反射调用
+    **生产的** `JarToolMixin`（不是手抄副本）跑改写
+  - 负向测试 `neg-realargs.ps1`：破坏**生产改写**（让危险值原样留下）→
+    探针 **17 通过 / 7 失败**
+  - **证据分级**：本地有真实 jar → 24 条断言全跑；CI 无 jar → 19 条（5 条
+    jar 级断言跳过），参数表级断言照跑
+  - 顺带修掉一个真实缺陷：构建脚本用**中文路径字面量**定位 watermedia jar，
+    而 `.ps1` 没有 BOM 时 WinPS 5.1 按 ANSI 读 → 路径乱码 → 静默跳过
+    （`[SKIP] 真实 jar 检查`）。现在改为**按文件名递归查找**，不依赖非 ASCII 字面量
   打印 `配置归一化：…` 那一行，它在**三种最常见的情况**上给错了答案：
   - `hw=null, vout=null`（**全新用户，刚生成的默认配置**）→ 报警
   - `hw=null, vout=gl,any` → 报警

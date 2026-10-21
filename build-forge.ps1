@@ -1,4 +1,4 @@
-﻿# Forge 1.20.1 variant builder.
+# Forge 1.20.1 variant builder.
 # Produces BiliFix-<version>-mc1.20.1-forge.jar from the SAME sources with 3 import
 # substitutions (net.neoforged.* -> net.minecraftforge.*) + Forge-flavored mods.toml.
 # Layout: src/main/java is shared; this script stages patched copies into build/forge.
@@ -434,6 +434,24 @@ if ((Test-Path "$root\src\test\java\RealArgumentsProbe.java") -and (Test-Path $m
     Get-Content "$raOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|\[SKIP\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($raP.ExitCode -ne 0) { throw 'Real arguments probe FAILED (the production rewrite does not neutralise the REAL watermedia parameter table)' }
     Write-Host 'Real arguments probe OK' -ForegroundColor Green
+
+# Doc structure probe. The CHANGELOG once had a "### 修复" heading split
+# into "### 修" / "" / "复" by a String.Replace whose anchor crossed a
+# newline. That damage is INVISIBLE to a build - the file is still valid
+# Markdown, it just renders with an empty section and a stray paragraph.
+# Release notes are how users learn what changed, so they get a probe too.
+if (Test-Path "$root\src\test\java\DocStructureProbe.java") {
+    $dsOut = Join-Path $OutDir 'docstruct-probe'
+    New-Item -ItemType Directory -Force -Path $dsOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -d $dsOut "$root\src\test\java\DocStructureProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Doc structure probe compile failed" }
+    $dsP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', $dsOut, 'DocStructureProbe', 'CHANGELOG.md') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$dsOut\stdout.txt" -RedirectStandardError "$dsOut\stderr.txt"
+    Get-Content "$dsOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($dsP.ExitCode -ne 0) { throw "Doc structure probe FAILED (the release notes are structurally broken)" }
+    Write-Host "Doc structure probe OK" -ForegroundColor Green
+}
 }
 
     # Null element probe: a null entry in the argument array must not make the

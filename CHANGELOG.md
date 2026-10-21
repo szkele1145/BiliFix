@@ -155,6 +155,19 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **有 4 条负向测试"批量能跑、单独必崩"**（`f33918` 之后）：
+  - `neg-cfgdefault` / `neg-fmlmodver` / `neg-nullelem` / `neg-unknownkey` 用了
+    `$repo` / `$jdk` 却**没有定义**
+  - 根因：PowerShell 的 `&` 调用会让子脚本**看见调用者的变量**，
+    `run-all-negative-tests.ps1` 的 `$repo` / `$jdk` 就这么"漏"了进去
+  - 后果：批量跑全绿，**单独跑必崩**（`Join-Path : ... because it is null`）——
+    而"单独跑一条"恰恰是测试挂掉时人第一件会做的事
+  - 修复：脚本自己定义 `$repo` / `$jdk`；新增
+    `src/test/negative/check-standalone.ps1` 把这条性质**变成守卫**：
+    逐条单独启动，且**从仓库根之外启动**（顺手抓出"偷偷依赖当前目录"的脚本）
+  - **这个守卫本身能失败**（`selftest-standalone.ps1`）：植入一个同款坏脚本，
+    断言「单独跑失败 → 守卫报出 → 清理后恢复全绿」→ `STANDALONE_CHECK_CAUGHT_IT`
+  - 顺带：`Resolve-JdkBin` 改成**显式接收仓库根**，不再读 `Get-Location`
 - **一整份克隆下来的仓库根本跑不起来**（`1da2ff0`）：本地工作副本**掩盖**了三个
   互相独立的缺陷。方法是**本地模拟 GitHub runner**（clone → 配 JDK → 恢复缓存
   → 跑仿真），见 `src/test/sim-ci-runner.ps1`

@@ -13,7 +13,7 @@ failures degrade silently (warnings at most), never escalate to load errors.
 ```powershell
 git clone https://github.com/szkele1145/BiliFix
 cd BiliFix
-./build.ps1        # compile + 137 regression assertions + 20 behaviour probes + jar integrity check
+./build.ps1        # compile + 140 regression assertions + 20 behaviour probes + jar integrity check
 ```
 
 Requirements: any JDK 21 (the build auto-detects `.tools\jdk21`, the MC runtime, or PATH).
@@ -38,7 +38,7 @@ src/main/resources/
   META-INF/neoforge.mods.toml  # FML metadata (also copied to mods.toml)
   bilifix.mixins.json          # mixin config (@Pseudo, defaultRequire=0; stays JAVA_21,
                                #   1.20.1 variants rewrite to JAVA_17 at packaging)
-src/test/java/Regression.java # 137 assertions, mirrors production logic 1:1
+src/test/java/Regression.java # 140 assertions, mirrors production logic 1:1
 src/test/java/ConcurrentRecordProbe.java  # links production classes: event cap under load
 src/test/java/FmlBridgeProbe.java         # links production classes: FML reflection chain
 src/test/java/ReadmeLogSampleProbe.java   # README log samples vs production strings

@@ -155,6 +155,32 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **旧 jar 残留在 build/ 里，而检查它的探针会把它当当前产物**（`83265ce`）：
+  三个相互关联的缺陷，源于一个真实的场景——`build/forge/` 里躺着
+  `BiliFix-1.4.7-mc1.20.1-forge.jar`（**几周**没人清理）：
+  1. **housekeeping 只清了 build/ 的根目录**。它只存在于 `build.ps1` 里，
+     `build/forge/` 和 `build/fabric/` **从来没人清过**。而 jar 元数据探针
+     扫的是 `build/` **递归**——残留的旧 jar 会被当成当前产物来检查
+     - 修复：三个构建脚本都清理**全部**输出目录，但**只删版本不同**的 jar
+       ——构建一个变体不该毁掉另两个变体的当前产物
+     - 位置：必须在**探针之前**。第一版放在脚本末尾，探针早就跑完了
+  2. **`Regression.pickJar` 取"修改时间最新"的 jar**。有残留时那就不是刚
+     构建出来的产物——检查一个不是当前代码产物的 jar，什么也证明不了
+     - 修复：只接受**当前版本**的 jar（`BiliFix-<version>-...`）
+  3. **`Regression` 读 jar 条目前不判空**。条目缺失恰恰是那段检查要检测的
+     失败情形，它却把**整个回归套件**打死
+     - 实证：把 forge jar 改名成 `BiliFix-1.4.8-mc1.20.1-fabric.jar` 放进
+       `build/fabric/`，旧代码直接抛
+       `NullPointerException: ze at JarFile.getInputStream`；修复后
+       **报 4 条 FAIL、exit 1、不崩**
+     - 修复：读条目前判空，缺失记 FAIL 并继续
+  - 新增断言（`Regression` 137 → **140** 条）：pickJar 只返回当前版本的 jar、
+    读条目不抛异常
+- **文档里的数字过期了**（`ff06cdc`）：README 与 README.zh-CN 写
+  "131 regression tests + 3 behaviour probes"，实际是 **137 条回归断言 +
+  20 个行为探针**（由 `Regression.class` 实跑得出：137/0/0）
+  - 顺带把 watermedia 2.1.37 的证据描述从"签名探针验证"升级为
+    "真实 jar 验证"——参数表是**从真实 jar 里读出来的**，不只是签名一致
 - **Fabric 侧的入口路径零自动化覆盖**——Fabric 是**唯一有独立入口**的加载器
   （`ModInitializer.onInitialize()` → 显式注入 `getGameDir()/getConfigDir()`），
   而共享核心 `init()` 里的顺序是**有语义的**：先注入目录，再读配置。顺序写反，

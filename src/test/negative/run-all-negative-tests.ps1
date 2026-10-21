@@ -20,6 +20,41 @@ if (-not (Test-Path $javaExe)) { Write-Host "[neg-all] 缺少 JDK: $javaExe"; ex
 $scripts = Get-ChildItem (Join-Path $repo 'src\test\negative') -Filter 'neg-*.ps1' -File | Sort-Object Name
 if ($scripts.Count -eq 0) { Write-Host "[neg-all] 没找到负向测试脚本"; exit 1 }
 
+# WORKING-TREE GUARD
+#
+# These negative tests break the production code ON PURPOSE, against the REAL
+# repository (not a copy) - so a script that resolves its temporary directory
+# wrongly can delete or overwrite repository files. That is not hypothetical:
+# run-all-negative-tests.ps1 itself was removed by a stray cleanup during
+# v1.4.8 development, and nothing noticed until the CI simulation failed much
+# later with "cannot find path ... run-all-negative-tests.ps1".
+#
+# The $tmp guards inside the individual neg-*.ps1 scripts only protect the
+# directory they delete; they cannot notice a deletion performed by some OTHER
+# script. So the guard has to live here, where the whole run is visible:
+# snapshot the working tree before, compare after, and report any difference.
+# A negative test that leaves the repository changed has failed, whether or not
+# its own assertions passed.
+function Get-TreeState {
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($rel in (git ls-files)) {
+        $full = Join-Path $repo $rel
+        if (-not (Test-Path -LiteralPath $full)) {
+            $lines.Add("DELETED $rel")
+        } else {
+            $h = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash
+            $lines.Add("$h $rel")
+        }
+    }
+    foreach ($rel in (git ls-files --others --exclude-standard)) {
+        $lines.Add("UNTRACKED $rel")
+    }
+    return ($lines | Sort-Object) -join "`n"
+}
+
+$before = Get-TreeState
+$beforeCount = ($before -split "`n").Count
+
 # Line endings must be LF, matching the Java sources these scripts anchor on.
 #
 # This check exists because of a real failure: every negative test below
@@ -62,6 +97,24 @@ foreach ($s in $scripts) {
 }
 
 Write-Host ""
+# WORKING-TREE GUARD (second half): the repository must be byte-identical to
+# how it was before the run. A negative test that leaves the tree changed has
+# failed - its own assertions passing does not make the damage acceptable.
+$after = Get-TreeState
+if ($after -ne $before) {
+    Write-Host ""
+    Write-Host "[neg-all] 失败：负向测试改动了工作树（跑之前 $beforeCount 条，跑之后 $(($after -split "`n").Count) 条）"
+    $diff = Compare-Object ($before -split "`n") ($after -split "`n")
+    $diff | Select-Object -First 20 | ForEach-Object {
+        $tag = if ($_.SideIndicator -eq '<=') { '消失/变更前' } else { '新增/变更后' }
+        Write-Host ("  " + $tag + ": " + $_.InputObject)
+    }
+    if (($diff | Measure-Object).Count -gt 20) {
+        Write-Host ("  ... 还有 " + ((($diff | Measure-Object).Count) - 20) + " 处差异")
+    }
+    Write-Host "[neg-all] 修复：找出是哪条负向测试动了仓库（逐条跑），并检查它的临时目录解析"
+    $failed += '工作树被改动'
+}
 Write-Host ("[neg-all] 负向测试总数: " + $scripts.Count + "  失败: " + $failed.Count)
 if ($failed.Count -gt 0) {
     $failed | ForEach-Object { Write-Host ("  FAILED: " + $_) }

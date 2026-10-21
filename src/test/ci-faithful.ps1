@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Faithful CI simulation.
@@ -33,14 +33,34 @@ $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPat
 Set-Location $root
 
 $tmp = Join-Path $env:TEMP 'ci-faithful'
-$javac = Join-Path $root '.tools\jdk21\bin\javac.exe'
-$java  = Join-Path $root '.tools\jdk21\bin\java.exe'
+# JDK resolution: the project's own toolchain first, then JAVA_HOME.
+# The GitHub runner has no .tools/jdk21 (it is git-ignored), so a script that
+# only knew about the project JDK could never run there - which is exactly
+# why the workflow used to carry its own COPY of this script.
+$jdkHome = Join-Path $root '.tools\jdk21'
+if (-not (Test-Path (Join-Path $jdkHome 'bin\javac.exe'))) {
+    if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\javac.exe'))) {
+        $jdkHome = $env:JAVA_HOME
+    } else {
+        Write-Host '::error::no JDK found (looked for .tools/jdk21 and JAVA_HOME)'
+        exit 1
+    }
+}
+$javac = Join-Path $jdkHome 'bin\javac.exe'
+$java  = Join-Path $jdkHome 'bin\java.exe'
 
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 # Copy exactly the tracked files (git ls-files -> relative paths)
+# `git ls-files` is what makes this faithful: a hand-written copy list
+# silently drifted three times (110 / 113 / 131 assertions) because it did
+# not match what actions/checkout produces.
 $tracked = git ls-files
+if (-not $tracked -or $tracked.Count -eq 0) {
+    Write-Host '::error::git ls-files returned nothing - the simulation would run against an EMPTY tree, which looks exactly like a green run'
+    exit 1
+}
 foreach ($rel in $tracked) {
     $src = Join-Path $root $rel
     $dst = Join-Path $tmp $rel

@@ -49,7 +49,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
 - ✅ **Every production class has a behaviour probe that links it** (9/9):
   `BiliFixMod`, `CrashSentinel`, `EnvironmentDiagnostics`, `MixinTargetGuard`,
   `BiliFixConfig`, `JarToolMixin`, `FmlBridge`
-- ✅ **All three build scripts run the full suite** - Regression (137) plus sixteen
+- ✅ **All three build scripts run the full suite** - Regression (137) plus seventeen
   behaviour probes that link the production classes: `ConcurrentRecordProbe`
   (event cap under 32-thread load), `FmlBridgeProbe` (FML reflection chain
   against stub classes under the real package names), `ReadmeLogSampleProbe`
@@ -85,7 +85,11 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   mirror test still passes) and `FabricInitProbe` (the Fabric loader is the
   only one with its own entry point, so the order inside
   `BiliFixMod.init()` is semantic - load the config before the dirs are
-  injected and the config file lands somewhere else, silently). Previously only
+  injected and the config file lands somewhere else, silently) and
+  `NormalizedWarningProbe` (an unset field means "not set", not "rewritten" -
+  three of the most common configs were warned about as normalized, printing a
+  line with two unchanged values plus a literal null during crash triage).
+  Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
   concurrency (event list exceeds the cap), FML bridge (missing `get()`),
@@ -97,7 +101,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   (raw voutValue() written to the diagnostics file again), unknown
   config key (the warning removed again), null element
   (both null guards removed again), FML mod version
-  (the version lookup replaced by the mod id), config default (the defaults hard-coded again), mirror parity (the mirror drifted from production), fabric init (the injected dirs are not used)
+  (the version lookup replaced by the mod id), config default (the defaults hard-coded again), mirror parity (the mirror drifted from production), fabric init (the injected dirs are not used), normalized warning (an unset field warned as normalized)
 - ✅ **Negative tests are in the repository**. They used to live in `out/`,
   which is git-ignored: the evidence that the probes can actually fail
   existed on one machine only. Now they live in `src/test/negative/` and

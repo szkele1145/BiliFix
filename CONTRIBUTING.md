@@ -55,6 +55,7 @@ src/test/java/FmlModVersionProbe.java      # links production classes: FmlBridge
 src/test/java/ConfigDefaultProbe.java    # links production classes: the default values have ONE source of truth
 src/test/java/MirrorParityProbe.java     # reflection-loads the Regression mirror and compares it against production
 src/test/java/FabricInitProbe.java      # the Fabric entry point: the injected dirs must really be used
+src/test/java/NormalizedWarningProbe.java  # an unset field must not warn as normalized
 src/test/stubs-fmlmodlist/                 # ModList + IModFileInfo stubs (kept OUT of src/test/stubs on purpose)
 src/test/negative/                         # negative tests: every probe must be able to fail
 src/test/negative/run-all-negative-tests.ps1  # runs all of them; any failure fails the build

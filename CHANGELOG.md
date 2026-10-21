@@ -76,6 +76,25 @@
 ### 修
 
 复
+- **没设的配置项被当成了"被归一化过"**——`strategyWasNormalized()` 决定要不要
+  打印 `配置归一化：…` 那一行，它在**三种最常见的情况**上给错了答案：
+  - `hw=null, vout=null`（**全新用户，刚生成的默认配置**）→ 报警
+  - `hw=null, vout=gl,any` → 报警
+  - `hw=none, vout=null`（**只设了 hwDecoder 的用户**）→ 报警
+  - 实际打印的都是 `配置归一化：hwDecoder 'none' → none, vout 'null' → original`
+    ——**两个值都没变**，还把 `null` 原样显示出来
+  - 根因：`null` 的语义是"未设置"，但 `effectiveStrategy()` 为显示把它映射成
+    `"original"`，旧比较把 `null` 当成了"被改写的值"
+  - **噪音警告是最坏的一种**：这行是在**崩溃排查时**读到的，它把注意力引向
+    一个不存在的问题
+  - 另：`keep → original` 别名用的是子串 `String.replace`，导致
+    `vout = "keepkeep"` 被替换成 `"originaloriginal"`，而 `voutValue()`（switch
+    整串匹配）原样保留 `keepkeep` —— 两边不一致，没改的值被报成"归一化过"
+  - 修复：`null` 不算变化；别名按整串匹配；语义与显示只要有一处不同就说明
+  - 新增 `NormalizedWarningProbe`（12 断言）+ 负向测试 `neg-normwarn.ps1`
+    （还原旧写法 → 7 通过 / 5 失败）
+  - `neg-startuplog.ps1` 的锚点是旧 return 语句，改写后**它自己先报
+    `ANCHOR_NORMALIZED_NOT_FOUND` 拒绝运行**（而不是静默通过）——锚点已更新
 - **Fabric 侧的入口路径零自动化覆盖**——Fabric 是**唯一有独立入口**的加载器
   （`ModInitializer.onInitialize()` → 显式注入 `getGameDir()/getConfigDir()`），
   而共享核心 `init()` 里的顺序是**有语义的**：先注入目录，再读配置。顺序写反，

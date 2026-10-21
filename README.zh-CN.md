@@ -92,7 +92,7 @@ verbose = false
 |---|---|
 | Minecraft | 1.21.1（NeoForge）/ 1.20.1（Forge、Fabric） |
 | 加载器 | NeoForge 21.1.x / Forge 47.x / Fabric Loader 0.14.21+ |
-| watermedia | **2.1.x**（真机验证：2.1.36 · 签名探针验证：2.1.37） |
+| watermedia | **2.1.x**（真机验证：2.1.36 · 真实 jar 验证：2.1.36 + 2.1.37） |
 | bilibili_media | 2.3 |
 
 理论上同样适用于所有用 watermedia 2.1 播放视频的场景（netmusic、waterframes 等），不限 B 站。
@@ -114,7 +114,9 @@ verbose = false
 ```
 
 > 括号里的参数数量由 watermedia 决定，会随其版本变化（2.1.36/2.1.37 实测均为 18 项，
-> `javap` 已确认两版 `JarTool.readArray(String)` 签名一致）；
+> 该数字是**从真实的 `watermedia-2.1.36.jar` 里读出真实参数表**得到的；
+> `javap` 已确认两版 `JarTool.readArray(String)` 签名一致，且 `PlayerAPI`
+> 实际调用的正是这个方法）；
 > 关键是两个加固项已替换、且总项数不变（没有丢参数）。
 > `GPU:` 行显示的是本机全部显示适配器（多显卡会并列，用 ` / ` 分隔）；非 Windows
 > 系统不显示这行。

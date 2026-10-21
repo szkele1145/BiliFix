@@ -56,6 +56,8 @@ src/test/java/ConfigDefaultProbe.java    # links production classes: the default
 src/test/java/MirrorParityProbe.java     # reflection-loads the Regression mirror and compares it against production
 src/test/java/FabricInitProbe.java      # the Fabric entry point: the injected dirs must really be used
 src/test/java/NormalizedWarningProbe.java  # an unset field must not warn as normalized
+src/test/java/RealArgumentsProbe.java  # the rewrite vs the parameter table watermedia ACTUALLY ships
+src/test/java/DocStructureProbe.java   # the release notes must not be structurally broken
 src/test/stubs-fmlmodlist/                 # ModList + IModFileInfo stubs (kept OUT of src/test/stubs on purpose)
 src/test/negative/                         # negative tests: every probe must be able to fail
 src/test/negative/run-all-negative-tests.ps1  # runs all of them; any failure fails the build
@@ -80,7 +82,9 @@ Not all tests are equal - know which layer you are looking at:
 | Layer | File | Links production code? | What it proves |
 | --- | --- | --- | --- |
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
-| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe`, `UnknownConfigKeyProbe`, `NullElementProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe`, `UnknownConfigKeyProbe`, `NullElementProbe`, `FmlModVersionProbe`, `ConfigDefaultProbe`, `MirrorParityProbe`, `FabricInitProbe`, `NormalizedWarningProbe` | **Yes** | The production code actually behaves as intended |
+| Behaviour (against the real artefact) | `RealArgumentsProbe` | **Yes** - plus the real watermedia jar | The rewrite neutralises the parameter table watermedia actually ships, not a hand-written stand-in |
+| Documentation | `DocStructureProbe` | No - it reads `CHANGELOG.md` | The release notes are not structurally broken (a split heading renders as an empty section and no build notices) |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword
 `synchronized` - that checks the prescription, not the effect. The behaviour probes

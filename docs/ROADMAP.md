@@ -89,6 +89,17 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   `NormalizedWarningProbe` (an unset field means "not set", not "rewritten" -
   three of the most common configs were warned about as normalized, printing a
   line with two unchanged values plus a literal null during crash triage).
+  and `RealArgumentsProbe` (the whole fix rests on ONE mixin target, and every
+  assertion about it used a HAND-WRITTEN stand-in for watermedia's parameter
+  table - a hand-written table proves the rewrite works on hand-written data,
+  not that it works on what watermedia actually ships; this probe runs the
+  PRODUCTION rewrite against the real table read out of the real
+  watermedia-2.1.36.jar, and also checks the jar's bytecode to prove
+  `JarTool.readArray` is the method `PlayerAPI` really calls)
+  and `DocStructureProbe` (the release notes once had a `### 修复` heading
+  split into `### 修` / `` / `复` by a `String.Replace` whose anchor crossed a
+  newline - the file stayed valid Markdown, so no build noticed, but the
+  section rendered as empty with a stray paragraph).
   Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
@@ -101,7 +112,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   (raw voutValue() written to the diagnostics file again), unknown
   config key (the warning removed again), null element
   (both null guards removed again), FML mod version
-  (the version lookup replaced by the mod id), config default (the defaults hard-coded again), mirror parity (the mirror drifted from production), fabric init (the injected dirs are not used), normalized warning (an unset field warned as normalized)
+  (the version lookup replaced by the mod id), config default (the defaults hard-coded again), mirror parity (the mirror drifted from production), fabric init (the injected dirs are not used), normalized warning (an unset field warned as normalized), real arguments (the dangerous values survive the rewrite again), doc structure (a heading is split in two)
 - ✅ **Negative tests are in the repository**. They used to live in `out/`,
   which is git-ignored: the evidence that the probes can actually fail
   existed on one machine only. Now they live in `src/test/negative/` and

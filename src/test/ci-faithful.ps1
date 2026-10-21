@@ -18,6 +18,16 @@ $ErrorActionPreference = 'Stop'
 # a hard-coded absolute path: a literal like "C:\Users\<non-ascii>\..." is
 # read as ANSI by Windows PowerShell 5.1 when the .ps1 has no BOM, and the
 # path silently turns into mojibake.
+#
+# WHY THE GITHUB WORKFLOW IS NOT TRACKED (yet)
+# .github/workflows/ci.yml is excluded via .git/info/exclude: GitHub refuses
+# workflow files pushed with a PAT that lacks the "workflow" scope
+# ("refusing to allow a Personal Access Token to create or update workflow
+# .github/workflows/ci.yml without workflow scope"). The workflow file
+# itself lives in the working tree and is updated by hand.
+# Until it can be pushed, THIS script is the reproducible CI behaviour: it
+# runs the same probe list and the same negative tests, against a copy of
+# exactly the tracked files.
 
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
 Set-Location $root

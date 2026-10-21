@@ -313,6 +313,24 @@ foreach ($f in $encScripts) {
 Write-Host ("  ENCODING_SCRIPTS_SCANNED=" + $encScanned)
 Write-Host ("  ENCODING_FAILURES=" + $encFailed)
 
+# --- step: refresh the handoff document's HEAD ---
+# The handoff document states the commit it was written at. Writing that
+# by hand is always one commit behind (the commit that carries the
+# document is itself a new commit) - which has happened three times in
+# this project. So the line is refreshed from the repository instead.
+$handoff = Join-Path (Split-Path -Parent $root) 'BiliFix-HANDOFF.md'
+if (Test-Path $handoff) {
+    $head = (git -C $root rev-parse --short HEAD 2>$null)
+    if ($head) {
+        $ht = [System.IO.File]::ReadAllText($handoff, [System.Text.Encoding]::UTF8)
+        $updated = [regex]::Replace($ht, 'HEAD = `[0-9a-f]{7,40}`', "HEAD = ``$head``")
+        if ($updated -ne $ht) {
+            [System.IO.File]::WriteAllText($handoff, $updated, (New-Object System.Text.UTF8Encoding($false)))
+            Write-Host ("  HANDOFF_HEAD_REFRESHED=" + $head)
+        }
+    }
+}
+
 if ($negFailed -eq 0 -and $failed -eq 0 -and $regExit -eq 0 -and $prodExit -eq 0 -and $encFailed -eq 0) {
     Write-Host "FAITHFUL_CI_SIM_WITH_NEG=ALL_GREEN"
 } else {

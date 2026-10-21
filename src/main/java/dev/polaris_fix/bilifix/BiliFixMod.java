@@ -79,27 +79,47 @@ public class BiliFixMod {
     /**
      * 归一化是否改变了用户写下的值（用于额外打印一行说明）。
      *
-     * @return true = 配置被归一化过，值得告诉用户
+     * <p><b>null 表示"未设置"，不是"值变了"</b>：配置里没有该键时字段保持
+     * {@code null}，而 {@link #effectiveStrategy()} 为了显示把它映射成
+     * {@code "original"}。若把 {@code null → "original"} 当成归一化，
+     * <b>每个没写 vout 的用户每次启动都会看到一条"配置归一化"警告</b>——
+     * 两个值都没变、却警告"被改了"，这是最坏的一种噪音：它在崩溃排查时
+     * 把注意力引向一个不存在的问题。实测（v1.4.8 前）：11 个取值组合里
+     * 有 3 个是这种假阳性，恰好覆盖"全新用户"和"只设了 hwDecoder"两种常见情况。</p>
+     *
+     * <p>另：{@code keep} → {@code original} 是<b>完整字符串</b>的别名替换，
+     * 不是子串替换。{@code vout = "keepkeep"} 落到 default 分支、原样生效，
+     * 不能被当成"归一化过"。</p>
+     *
+     * @return true = 用户写下的值与其生效/显示值确有差异，值得告诉用户
      */
     public static boolean strategyWasNormalized() {
         String effHw = BiliFixConfig.hwDecoderValue();
         String effVout = BiliFixConfig.voutValue();
         String rawHw = BiliFixConfig.hwDecoder;
         String rawVout = BiliFixConfig.vout;
-        String effVoutText = effVout == null ? "original" : effVout;
-        // vout=original / keep 都表示"保留原值"，对用户是同一种语义
-        String rawVoutNorm = rawVout == null ? null
-                : rawVout.toLowerCase().trim().replace("keep", "original");
-        // 语义等价（忽略大小写与 keep/original 之别）→ 不算归一化
-        boolean hwSame = rawHw != null && rawHw.toLowerCase().trim().equals(effHw);
-        boolean voutSame = rawVoutNorm != null && rawVoutNorm.equals(effVoutText);
-        // 显示一致（逐字符）→ 也不算：用户看到的字符串没变
-        boolean hwIdentical = rawHw != null && rawHw.equals(effHw);
-        boolean voutIdentical = rawVout != null && rawVout.equals(effVoutText);
-        // 只要"用户写的"与"用户看到的"不完全一致，就值得说明一句。
-        // 例：vout=ORIGINAL → 启动行显示 original（大小写变了）；
-        //     vout=keep    → 启动行显示 original（语义别名变了）。
-        return !(hwSame && voutSame) || !(hwIdentical && voutIdentical);
+
+        // 未设置（null）就是未设置：没有"被改写"可言。
+        // 注意 hwDecoder 的 null 也会被 hwDecoderValue() 归一化成 none，
+        // 但那同样是"未设置 → 默认生效"，不是用户写错了什么。
+        //
+        // 两种都算"变了"：语义变了（gpu → none），或用户看到的字符串变了
+        // （" NONE " → none，虽然语义相同，但显示与所写不一致，值得说明）。
+        boolean hwChanged = rawHw != null
+                && (!rawHw.toLowerCase().trim().equals(effHw) || !rawHw.equals(effHw));
+        boolean voutChanged;
+        if (rawVout == null) {
+            // 未设置：effectiveStrategy() 显示 original，但这不是改写
+            voutChanged = false;
+        } else {
+            String norm = rawVout.toLowerCase().trim();
+            // keep 是 original 的别名，二者对用户是同一语义
+            if (norm.equals("keep")) norm = "original";
+            String effText = effVout == null ? "original" : effVout;
+            // 语义相同但用户看到的字符串不同（大小写、keep 别名）也值得说一句
+            voutChanged = !norm.equals(effText) || !rawVout.equals(effText);
+        }
+        return hwChanged || voutChanged;
     }
 
     public static void init(Path gameDir, Path configDir) {

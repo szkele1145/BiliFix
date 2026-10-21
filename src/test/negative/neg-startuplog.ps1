@@ -54,7 +54,7 @@ if (-not $text.Contains($old1)) { Write-Host 'ANCHOR_EFFECTIVE_NOT_FOUND'; exit 
 $text = $text.Replace($old1, $new1)
 
 # BREAK 2: never report that the configuration was normalized
-$old2 = '        return !(hwSame && voutSame) || !(hwIdentical && voutIdentical);'
+$old2 = '        return hwChanged || voutChanged;'
 $new2 = '        return false;'
 if (-not $text.Contains($old2)) { Write-Host 'ANCHOR_NORMALIZED_NOT_FOUND'; exit 1 }
 $text = $text.Replace($old2, $new2)

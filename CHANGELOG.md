@@ -127,6 +127,34 @@
     （还原旧写法 → 7 通过 / 5 失败）
   - `neg-startuplog.ps1` 的锚点是旧 return 语句，改写后**它自己先报
     `ANCHOR_NORMALIZED_NOT_FOUND` 拒绝运行**（而不是静默通过）——锚点已更新
+- **NeoForge jar 里带着一个谁都不读的死文件**（新增证据层级）：`META-INF/mods.toml`
+  和 `META-INF/neoforge.mods.toml` **内容完全相同**，两个都打进了 NeoForge jar。
+  看着像"兼容两个 loader"，其实是 1.3.2 时期"一个 jar 也要在老 Forge 上加载"
+  的遗留——那时项目只有一个 jar。三个变体分家后，这个文件彻底没人读了：
+  - **实测**（2026-10-21，真实 `fancymodloader-4.0.45.jar`）：FML 的
+    `ModFileParser` 常量池里**只有** `META-INF/neoforge.mods.toml` 一个字符串，
+    **没有** `mods.toml`。NeoForge 21.1 根本不会读它
+  - 危害不是"多占 1 KB"：用户解包 jar 会看到两个一模一样的元数据文件，
+    不知道哪个生效——而"哪个文件真正决定模组能不能加载"正是排查这类问题
+    时最先要确认的事
+  - 修复：删掉源码里的 `META-INF/mods.toml`，打包脚本不再把它塞进 NeoForge jar
+    （jar 从 19 条目降到 18 条目，30904 → 30265 字节）
+  - **回归守卫**：`Regression` §9.8 的版本一致性断言改为"死文件必须不存在"
+  - 新增 `JarMetadataProbe`（32 断言，**查的是打包好的 jar，不是源码**）：
+    - 从 jar **自身内容**推断它是哪种 loader 的产物（看存在哪个元数据文件），
+      **不靠参数顺序**——第一版靠顺序，build-forge 把 Forge jar 传到 NeoForge
+      的位置上，4 条断言全红，而那个 jar 其实完全正常
+    - 断言：恰好一种 loader 元数据（没有串台）、元数据声明的版本与 **jar 文件名**
+      一致（不硬编码版本号，否则 `build/` 里残留的旧 jar 会被误判为坏）、
+      mixin `compatibilityLevel`（NeoForge=JAVA_21，1.20.1 两端=JAVA_17）、
+      `JarToolMixin` / `BiliFixMod` / `BiliFixFabric` 类在 jar 里
+    - 接入**三个构建脚本**，位置在**打包之后**（查的就是产物），
+      扫 `build/` 下所有 `BiliFix-*.jar`；一个都没找到时明确 SKIP 而不是
+      "假装检查过了"
+    - 负向测试 `neg-jarmeta.ps1`：① 往 NeoForge jar 里塞 `fabric.mod.json`
+      ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
+      **证明探针抓得住它声称覆盖的问题**
+  - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
 - **Fabric 侧的入口路径零自动化覆盖**——Fabric 是**唯一有独立入口**的加载器
   （`ModInitializer.onInitialize()` → 显式注入 `getGameDir()/getConfigDir()`），
   而共享核心 `init()` 里的顺序是**有语义的**：先注入目录，再读配置。顺序写反，

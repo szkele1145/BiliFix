@@ -13,7 +13,7 @@ failures degrade silently (warnings at most), never escalate to load errors.
 ```powershell
 git clone https://github.com/szkele1145/BiliFix
 cd BiliFix
-./build.ps1        # compile + 131 regression tests + 3 behaviour probes + jar integrity check
+./build.ps1        # compile + 137 regression assertions + 20 behaviour probes + jar integrity check
 ```
 
 Requirements: any JDK 21 (the build auto-detects `.tools\jdk21`, the MC runtime, or PATH).
@@ -58,6 +58,7 @@ src/test/java/FabricInitProbe.java      # the Fabric entry point: the injected d
 src/test/java/NormalizedWarningProbe.java  # an unset field must not warn as normalized
 src/test/java/RealArgumentsProbe.java  # the rewrite vs the parameter table watermedia ACTUALLY ships
 src/test/java/DocStructureProbe.java   # the release notes must not be structurally broken
+src/test/java/JarMetadataProbe.java    # the PACKAGED jar: loader metadata, version, mixin level
 src/test/stubs-fmlmodlist/                 # ModList + IModFileInfo stubs (kept OUT of src/test/stubs on purpose)
 src/test/negative/                         # negative tests: every probe must be able to fail
 src/test/negative/run-all-negative-tests.ps1  # runs all of them; any failure fails the build
@@ -84,6 +85,7 @@ Not all tests are equal - know which layer you are looking at:
 | Mirror | `Regression.java` | **No** - it re-implements the logic | The *rules* hold. A mirrored copy cannot catch a bug in the production code itself |
 | Behaviour | `ConcurrentRecordProbe`, `FmlBridgeProbe`, `ReadmeLogSampleProbe`, `GpuDetectProbe`, `ArgumentRewriteProbe`, `ForensicsSuppressionProbe`, `ConfigParseProbe`, `MixinTargetGuardProbe`, `StartupLogTruthProbe`, `ForensicsVoutProbe`, `UnknownConfigKeyProbe`, `NullElementProbe`, `FmlModVersionProbe`, `ConfigDefaultProbe`, `MirrorParityProbe`, `FabricInitProbe`, `NormalizedWarningProbe` | **Yes** | The production code actually behaves as intended |
 | Behaviour (against the real artefact) | `RealArgumentsProbe` | **Yes** - plus the real watermedia jar | The rewrite neutralises the parameter table watermedia actually ships, not a hand-written stand-in |
+| Behaviour (against the packaged artefact) | `JarMetadataProbe` | No - it reads the built jar | The jar the user downloads carries exactly one loader's metadata, the right version and the right mixin compatibility level |
 | Documentation | `DocStructureProbe` | No - it reads `CHANGELOG.md` | The release notes are not structurally broken (a split heading renders as an empty section and no build notices) |
 
 This distinction matters. `Regression`'s §14 asserts the source contains the keyword

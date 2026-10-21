@@ -100,6 +100,17 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   split into `### 修` / `` / `复` by a `String.Replace` whose anchor crossed a
   newline - the file stayed valid Markdown, so no build noticed, but the
   section rendered as empty with a stray paragraph).
+  and `JarMetadataProbe` (the NeoForge jar carried a dead
+  `META-INF/mods.toml` - a leftover from the 1.3.2 era when one jar had to
+  work on old Forge too. The real FML loader 4.0.45's `ModFileParser`
+  constant pool contains only "META-INF/neoforge.mods.toml", so nothing
+  ever read the second copy; a user unzipping the jar sees two identical
+  metadata files and cannot tell which one counts. This probe inspects the
+  PACKAGED jar - exactly one loader's metadata, the version in the
+  metadata matching the jar's file name, the right mixin compatibility
+  level, the mod classes present. It infers the loader from the jar's own
+  contents, because a first version took the loader from the argument
+  order and made a perfectly good Forge jar fail four assertions).
   Previously only
   `build.ps1` tested, leaving the two 1.20.1 variants unguarded
 - ✅ Every behaviour probe has a **negative test** proving it can fail:
@@ -112,7 +123,7 @@ Status legend: ✅ done · 🔄 in progress · ⏳ planned (needs something) · 
   (raw voutValue() written to the diagnostics file again), unknown
   config key (the warning removed again), null element
   (both null guards removed again), FML mod version
-  (the version lookup replaced by the mod id), config default (the defaults hard-coded again), mirror parity (the mirror drifted from production), fabric init (the injected dirs are not used), normalized warning (an unset field warned as normalized), real arguments (the dangerous values survive the rewrite again), doc structure (a heading is split in two)
+  (the version lookup replaced by the mod id), config default (the defaults hard-coded again), mirror parity (the mirror drifted from production), fabric init (the injected dirs are not used), normalized warning (an unset field warned as normalized), real arguments (the dangerous values survive the rewrite again), doc structure (a heading is split in two), jar metadata (a foreign loader metadata file added / the mixin compatibility level changed)
 - ✅ **Negative tests are in the repository**. They used to live in `out/`,
   which is git-ignored: the evidence that the probes can actually fail
   existed on one machine only. Now they live in `src/test/negative/` and

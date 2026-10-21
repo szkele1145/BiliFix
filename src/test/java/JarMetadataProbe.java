@@ -142,7 +142,12 @@ public class JarMetadataProbe {
         for (String a : args) if (a != null && !a.isBlank()) jars.add(a);
 
         if (jars.isEmpty()) {
-            System.out.println("  [SKIP] 未提供 jar 路径");
+            // Honest reporting: this is a SKIP, not a pass. Counting it as
+            // "0 skipped" would make a CI run that checked nothing look
+            // identical to one that checked everything - exactly the
+            // "a probe that silently checks nothing is worse than no probe"
+            // trap.
+            skipCheck("未提供 jar 路径（CI 不打包 jar 时属于正常情况）");
             System.out.println();
             System.out.println("通过 " + pass + " / 失败 " + fail + " / 跳过 " + skip);
             System.out.println("RESULT = PASS");

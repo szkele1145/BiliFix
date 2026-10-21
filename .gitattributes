@@ -1,0 +1,49 @@
+# Line endings are pinned on purpose.
+#
+# The negative tests anchor on multi-line here-strings copied verbatim out
+# of the Java sources. A CRLF test script looks for "...\r\n" while the Java
+# source has "...\n", the anchor stops matching, and the test fails with
+# "anchor not found" - which reads like a production regression but is
+# really a line-ending mismatch in the harness.
+#
+# That failure cost a full debugging session once (9 of 19 negative tests
+# failed at once, and the cause was a checkout that had rewritten LF into
+# CRLF). core.autocrlf=true is the default on Windows, so without this
+# file EVERY contributor on Windows would hit it.
+#
+# The rules below are checked in as LF and checked out as LF everywhere.
+
+* text=auto eol=lf
+
+# Sources, scripts, config and docs: LF everywhere.
+*.java    text eol=lf
+*.kt      text eol=lf
+*.ps1     text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.json    text eol=lf
+*.toml    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.xml     text eol=lf
+*.gradle  text eol=lf
+*.properties text eol=lf
+*.mjs     text eol=lf
+*.js      text eol=lf
+*.ts      text eol=lf
+*.css     text eol=lf
+*.html    text eol=lf
+
+# Binaries: never touched.
+*.jar     binary
+*.zip     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.class   binary
+*.exe     binary
+*.dll     binary
+*.so      binary
+*.dylib   binary

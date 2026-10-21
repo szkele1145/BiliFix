@@ -12,8 +12,18 @@
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+# The repository root and the JDK are derived from THIS script's own location
+# and the environment - never hard-coded. A hard-coded
+# "C:\Users\<non-ascii>\Desktop\BiliFix" points at somebody else's working
+# copy in a clone, and turns into mojibake when the .ps1 has no BOM (Windows
+# PowerShell 5.1 reads it as ANSI).
+$d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
+. (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
+$jdkBin = Resolve-JdkBin
+if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
+$javac = Join-Path $jdkBin 'javac.exe'
+$java  = Join-Path $jdkBin 'java.exe'
 
-$repo = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $tmp = Join-Path $env:TEMP ('bilifix-neg-cfgdefault-' + [guid]::NewGuid().ToString('N').Substring(0,8))
 # SAFETY: only ever delete a directory that is inside %TEMP% and carries
 # our own prefix. A mis-resolved $tmp must never be able to delete
@@ -58,7 +68,7 @@ $text = $text.Replace($old2, $new2)
 Write-Host '[neg] 已还原：默认值漂移（catch 块用字面量 + 写文件用 direct3d11）'
 
 # 2) compile the broken production class + the probe
-$jdk = Join-Path $repo '.tools\jdk21\bin'
+$jdk = $jdkBin
 $slf4jJar = (Get-ChildItem (Join-Path $repo 'build\fabric\libs') -Filter 'slf4j-api-*.jar' | Select-Object -First 1).FullName
 $cpJars = $slf4jJar
 $classes = Join-Path $tmp 'classes'

@@ -1,5 +1,16 @@
 ﻿$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+# The repository root and the JDK are derived from THIS script's own location
+# and the environment - never hard-coded. A hard-coded
+# "C:\Users\<non-ascii>\Desktop\BiliFix" points at somebody else's working
+# copy in a clone, and turns into mojibake when the .ps1 has no BOM (Windows
+# PowerShell 5.1 reads it as ANSI).
+$d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
+. (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
+$jdkBin = Resolve-JdkBin
+if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
+$javac = Join-Path $jdkBin 'javac.exe'
+$java  = Join-Path $jdkBin 'java.exe'
 
 # Negative test for JarMetadataProbe.
 #
@@ -16,9 +27,8 @@
 #            1.20.1 runtime mixin does not have (JAVA_21), which blows up
 #            in the mixin bootstrap phase.
 
-$d = 'C:\Users\一只屑\Desktop\BiliFix'
-$javac = "$d\.tools\jdk21\bin\javac.exe"
-$java  = "$d\.tools\jdk21\bin\java.exe"
+$javac = Join-Path $jdkBin 'javac.exe'
+$java  = Join-Path $jdkBin 'java.exe'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 $tmp = Join-Path $env:TEMP ('bilifix-neg-jarmeta-' + [guid]::NewGuid().ToString('N').Substring(0,8))

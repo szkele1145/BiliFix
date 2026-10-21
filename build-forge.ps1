@@ -1,4 +1,4 @@
-# Forge 1.20.1 variant builder.
+﻿# Forge 1.20.1 variant builder.
 # Produces BiliFix-<version>-mc1.20.1-forge.jar from the SAME sources with 3 import
 # substitutions (net.neoforged.* -> net.minecraftforge.*) + Forge-flavored mods.toml.
 # Layout: src/main/java is shared; this script stages patched copies into build/forge.

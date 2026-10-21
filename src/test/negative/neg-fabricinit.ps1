@@ -1,5 +1,16 @@
 ﻿$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+# The repository root and the JDK are derived from THIS script's own location
+# and the environment - never hard-coded. A hard-coded
+# "C:\Users\<non-ascii>\Desktop\BiliFix" points at somebody else's working
+# copy in a clone, and turns into mojibake when the .ps1 has no BOM (Windows
+# PowerShell 5.1 reads it as ANSI).
+$d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
+. (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
+$jdkBin = Resolve-JdkBin
+if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
+$javac = Join-Path $jdkBin 'javac.exe'
+$java  = Join-Path $jdkBin 'java.exe'
 
 # Negative test for FabricInitProbe.
 #
@@ -15,9 +26,8 @@
 # silent failure this project keeps hunting down, and the Fabric path is
 # the one loader that goes through the explicit injection.
 
-$d = 'C:\Users\一只屑\Desktop\BiliFix'
-$javac = "$d\.tools\jdk21\bin\javac.exe"
-$java  = "$d\.tools\jdk21\bin\java.exe"
+$javac = Join-Path $jdkBin 'javac.exe'
+$java  = Join-Path $jdkBin 'java.exe'
 $slf4j = "$d\build\fabric\libs\slf4j-api-2.0.7.jar"
 $mixin = (Get-ChildItem "$d\build\fabric\libs" -Filter 'mixin-*.jar' | Select-Object -First 1).FullName
 $cp = "$slf4j;$mixin"

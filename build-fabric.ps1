@@ -1,4 +1,4 @@
-# build-fabric.ps1 - build the Fabric 1.20.1 variant of BiliFix
+﻿# build-fabric.ps1 - build the Fabric 1.20.1 variant of BiliFix
 #
 # Why this variant needs a staging step at all:
 #   src/main/java/* is compiled against NeoForge by build.ps1, and the class

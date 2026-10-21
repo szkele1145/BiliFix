@@ -7,7 +7,17 @@
 # 而不是工作副本——否则断言会检查没被还原的文件，对坏代码假 PASS。
 
 $ErrorActionPreference = 'Stop'
-$repo = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+# The repository root and the JDK are derived from THIS script's own location
+# and the environment - never hard-coded. A hard-coded
+# "C:\Users\<non-ascii>\Desktop\BiliFix" points at somebody else's working
+# copy in a clone, and turns into mojibake when the .ps1 has no BOM (Windows
+# PowerShell 5.1 reads it as ANSI).
+$d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
+. (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
+$jdkBin = Resolve-JdkBin
+if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
+$javac = Join-Path $jdkBin 'javac.exe'
+$java  = Join-Path $jdkBin 'java.exe'
 $tmp = Join-Path $env:TEMP ("bilifix-neg-unknownkey-" + [guid]::NewGuid().ToString('N').Substring(0,8))
 # SAFETY: only ever delete a directory that is inside %TEMP% and carries
 # our own prefix. A mis-resolved $tmp must never be able to delete
@@ -58,7 +68,7 @@ $text = $text.Replace($before, '')
 Write-Host "[neg] 已还原：移除未识别键警告"
 
 # 3) 编译还原后的生产源码 + 探针
-$jdk = Join-Path $repo '.tools\jdk21\bin'
+$jdk = $jdkBin
 $cpJars = @(
     (Join-Path $repo 'build\fabric\libs\slf4j-api-2.0.7.jar'),
     (Join-Path $repo 'build\fabric\libs\mixin-0.8.5.jar')

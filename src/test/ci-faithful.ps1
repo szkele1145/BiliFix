@@ -75,20 +75,25 @@ $deps = @(
     @{ url = 'https://repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.7/slf4j-api-2.0.7.jar'; f = 'slf4j-api-2.0.7.jar' },
     @{ url = 'https://repo.spongepowered.org/repository/maven-public/org/spongepowered/mixin/0.8.5/mixin-0.8.5.jar'; f = 'mixin-0.8.5.jar' }
 )
-# Offline fallback: the project's own build already downloaded these jars
-# into build/fabric/libs (they are git-ignored, so the simulation cannot copy
-# them). Without the fallback the simulation dies on a network hiccup and the
-# whole test suite silently stops running - the worst possible outcome for a
-# "the CI is green" signal.
-$localLibs = @(
-    (Join-Path $root 'build\fabric\libs\slf4j-api-2.0.7.jar'),
-    (Join-Path $root 'build\fabric\libs\mixin-0.8.5.jar')
-)
 foreach ($dep in $deps) {
     $t = Join-Path "$tmp\out\ci-libs" $dep.f
     if (Test-Path $t) { continue }
-    $local = $localLibs | Where-Object { (Split-Path $_ -Leaf) -eq $dep.f } | Select-Object -First 1
-    if ($local -and (Test-Path $local)) {
+    # Where a copy of this jar might already be on this machine, in the order
+    # that makes the GitHub Actions cache useful:
+    #   1. <repo>/out/ci-libs  - where the workflow's "Cache dependency jars"
+    #      step downloads them, and what actions/cache restores. Without this
+    #      entry the simulation would download its own copy into the temp
+    #      tree and the cache would never be hit.
+    #   2. <repo>/build/fabric/libs - what the project build already fetched.
+    #      Without this fallback a network hiccup kills the whole simulation
+    #      and the test suite silently stops running - the worst possible
+    #      outcome for a "the CI is green" signal.
+    $candidates = @(
+        (Join-Path $root "out\ci-libs\$($dep.f)"),
+        (Join-Path $root "build\fabric\libs\$($dep.f)")
+    )
+    $local = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($local) {
         Copy-Item $local $t -Force
         Write-Host "  (offline: reused $local)"
         continue

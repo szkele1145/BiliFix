@@ -1,4 +1,4 @@
-# Build script (PowerShell, Windows)
+﻿# Build script (PowerShell, Windows)
 # Requires: local Minecraft runtime JDK (javac/jar), NeoForge 21.1 libs, mixin 0.8.5, watermedia jar
 # Usage: ./build.ps1 [-WatermediaJar <path>] [-OutDir <dir>]
 #

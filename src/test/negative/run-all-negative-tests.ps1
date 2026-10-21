@@ -13,8 +13,23 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 Set-Location $repo
 
-$jdk = Join-Path $repo '.tools\jdk21\bin'
-$javaExe = Join-Path $jdk 'java.exe'
+# JDK resolution: the project's own toolchain first, then JAVA_HOME.
+# The CI runner has a complete JDK in JAVA_HOME (setup-java) but no
+# .tools/jdk21 - the project toolchain is git-ignored. Copying just
+# java.exe + javac.exe into .tools/jdk21 does NOT work: JDK 21 is modular,
+# so javac.exe needs the jdk.compiler module from lib/ and dies with
+# "Module jdk.compiler not found".
+$jdkBin = Join-Path $repo '.tools\jdk21\bin'
+if (-not (Test-Path (Join-Path $jdkBin 'java.exe'))) {
+    if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
+        $jdkBin = Join-Path $env:JAVA_HOME 'bin'
+        Write-Host ("[neg-all] 用 JAVA_HOME 的 JDK: " + $jdkBin)
+    } else {
+        Write-Host "[neg-all] 缺少 JDK：既没有 .tools\jdk21\bin\java.exe，也没有 JAVA_HOME"
+        exit 1
+    }
+}
+$javaExe = Join-Path $jdkBin 'java.exe'
 if (-not (Test-Path $javaExe)) { Write-Host "[neg-all] 缺少 JDK: $javaExe"; exit 1 }
 
 $scripts = Get-ChildItem (Join-Path $repo 'src\test\negative') -Filter 'neg-*.ps1' -File | Sort-Object Name

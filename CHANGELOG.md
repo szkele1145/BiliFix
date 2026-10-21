@@ -155,6 +155,26 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **一整份克隆下来的仓库根本跑不起来**（`1da2ff0`）：本地工作副本**掩盖**了三个
+  互相独立的缺陷。方法是**本地模拟 GitHub runner**（clone → 配 JDK → 恢复缓存
+  → 跑仿真），见 `src/test/sim-ci-runner.ps1`
+  1. **步骤叫"Cache dependency jars"却根本没缓存**——它只是下载，每次跑都联网
+     - 修复：真的加 `actions/cache`，且 `src/test/ci-faithful.ps1` **先**去
+       `out/ci-libs`（缓存目录）找——否则恢复的缓存根本用不上
+  2. **workflow 靠"只复制 `java.exe` + `javac.exe`"来满足测试脚本**——这**行不通**：
+     JDK 21 是模块化的，`javac.exe` 需要 `lib/` 里的 `jdk.compiler` 模块，
+     只有两个 exe 时每次编译都报 `Module jdk.compiler not found`
+     - 修复：脚本自己解析 JDK（`.tools/jdk21` → `JAVA_HOME`，runner 上
+       `actions/setup-java` 装的是**完整** JDK），那步复制整个删掉
+  3. **20 个负向测试全都硬编码 `$d = 'C:\Users\<中文>\Desktop\BiliFix'`**
+     - 在克隆里，那个路径要么不存在，要么**指向别人（开发者本机）的工作副本**
+       ——脚本会从**错误的树**里拷源码，"测试"的根本不是正在提交的那个仓库
+     - 而且 `.ps1` 无 BOM 时 WinPS 5.1 按 ANSI 读，路径直接乱码
+     - 修复：仓库根一律**从脚本自身位置推导**（`$PSCommandPath` 上溯四层），
+       JDK 走共享 helper `src/test/negative/jdk.ps1`
+  - **证据**：`src/test/sim-ci-runner.ps1`（已入版本库）端到端复现 runner，
+    结果 `RUNNER_SIM=ALL_GREEN`；它复现前**先失败**（编译不通过）
+  - 顺带：三个构建脚本现在**显式带 UTF-8 BOM**（含中文，缺 BOM 会被按 ANSI 读）
 - **负向测试会改真实仓库，而没有任何机制发现它改了**（`2b85858`）：
   负向测试**故意破坏生产代码**，且是在**真实工作树**上跑的（不是副本）——
   所以任何一条脚本把临时目录解析错了，就能删掉或改写仓库里的文件

@@ -22,6 +22,13 @@ $javac = "$d\.tools\jdk21\bin\javac.exe"
 $java  = "$d\.tools\jdk21\bin\java.exe"
 $cp = "$d\build\fabric\libs\slf4j-api-2.0.7.jar;$d\build\fabric\libs\mixin-0.8.5.jar"
 $tmp = Join-Path $env:TEMP 'cfg-neg'
+# SAFETY: only ever delete a directory that is inside %TEMP% and carries
+# our own prefix. A mis-resolved $tmp must never be able to delete
+# repository files.
+if ($tmp -and -not $tmp.StartsWith((Join-Path $env:TEMP ''))) {
+Write-Host ("SAFETY: 拒绝删除不在 %TEMP% 下的路径: " + $tmp)
+exit 1
+}
 
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path "$tmp\src" | Out-Null

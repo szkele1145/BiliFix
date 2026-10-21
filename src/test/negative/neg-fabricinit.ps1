@@ -23,6 +23,13 @@ $mixin = (Get-ChildItem "$d\build\fabric\libs" -Filter 'mixin-*.jar' | Select-Ob
 $cp = "$slf4j;$mixin"
 
 $tmp = Join-Path $env:TEMP ('bilifix-neg-fabricinit-' + [guid]::NewGuid().ToString('N').Substring(0,8))
+# SAFETY: only ever delete a directory that is inside %TEMP% and carries
+# our own prefix. A mis-resolved $tmp must never be able to delete
+# repository files.
+if ($tmp -and -not $tmp.StartsWith((Join-Path $env:TEMP ''))) {
+Write-Host ("SAFETY: 拒绝删除不在 %TEMP% 下的路径: " + $tmp)
+exit 1
+}
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path "$tmp\out" | Out-Null
 Write-Host "[neg] 准备临时副本: $tmp"

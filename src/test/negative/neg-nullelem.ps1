@@ -10,6 +10,13 @@
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $tmp = Join-Path $env:TEMP ("bilifix-neg-nullelem-" + [guid]::NewGuid().ToString('N').Substring(0,8))
+# SAFETY: only ever delete a directory that is inside %TEMP% and carries
+# our own prefix. A mis-resolved $tmp must never be able to delete
+# repository files.
+if ($tmp -and -not $tmp.StartsWith((Join-Path $env:TEMP ''))) {
+Write-Host ("SAFETY: 拒绝删除不在 %TEMP% 下的路径: " + $tmp)
+exit 1
+}
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 Write-Host "[neg] 准备临时副本: $tmp"

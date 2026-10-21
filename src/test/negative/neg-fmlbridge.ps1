@@ -11,6 +11,13 @@ $d = 'C:\Users\一只屑\Desktop\BiliFix'
 $javac = "$d\.tools\jdk21\bin\javac.exe"
 $java  = "$d\.tools\jdk21\bin\java.exe"
 $tmp = Join-Path $env:TEMP 'fmlbridge-neg2'
+# SAFETY: only ever delete a directory that is inside %TEMP% and carries
+# our own prefix. A mis-resolved $tmp must never be able to delete
+# repository files.
+if ($tmp -and -not $tmp.StartsWith((Join-Path $env:TEMP ''))) {
+Write-Host ("SAFETY: 拒绝删除不在 %TEMP% 下的路径: " + $tmp)
+exit 1
+}
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue

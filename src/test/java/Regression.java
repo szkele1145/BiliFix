@@ -8,7 +8,7 @@ public class Regression {
     static int passed = 0, failed = 0, skipped = 0;
 
     /**
-     * 版本号单一来源：从 mods.toml 读取。
+     * 版本号单一来源：从 neoforge.mods.toml 读取。
      * v1.4.8 教训——此前测试把版本硬编码（jar 名 + toml 断言），于是每次 bump 都要人工同步
      * 第 5、第 6 个版本点，漏掉一个就让全套回归变红。改为动态解析后，bump 只需改描述符本身。
      */
@@ -16,8 +16,7 @@ public class Regression {
 
     static String readSourceVersion() {
         String[] candidates = {
-            "src/main/resources/META-INF/neoforge.mods.toml",
-            "src/main/resources/META-INF/mods.toml"
+            "src/main/resources/META-INF/neoforge.mods.toml"
         };
         for (String rel : candidates) {
             try {
@@ -261,19 +260,25 @@ public class Regression {
             skip("mods.toml: 源文件缺失，跳过结构检查");
         }
 
-        // ============ 9.8. 版本一致性：四处描述符必须同版本（v1.4.8 防漏改） ============
-        // 历史教训：bump 时要人工改 mods.toml / neoforge.mods.toml / fabric.mod.json /
-        // BiliFixMod.VERSION 四处，漏一处就会出现"jar 名与描述符版本不符"的发布事故。
-        check("版本来源: 可从 mods.toml 解析", SOURCE_VERSION != null);
+        // ============ 9.8. 版本一致性：所有描述符必须同版本（v1.4.8 防漏改） ============
+        // 历史教训：bump 时要人工改 neoforge.mods.toml / fabric.mod.json /
+        // BiliFixMod.VERSION 三处，漏一处就会出现"jar 名与描述符版本不符"的发布事故。
+        //
+        // 注意：META-INF/mods.toml 曾在描述符之列，但它在 NeoForge 21.1 上是**死文件**
+        // ——实测 FML loader 4.0.45 的 ModFileParser 常量池里只有
+        // "META-INF/neoforge.mods.toml"，没有 "mods.toml"。它是 1.3.2 时期"一个 jar
+        // 也要兼容老 Forge FML"的遗留，三个 jar 分家后已删除。
+        check("版本来源: 可从 neoforge.mods.toml 解析", SOURCE_VERSION != null);
         if (SOURCE_VERSION != null) {
-            check("版本一致: mods.toml == neoforge.mods.toml",
-                    versionOf(Paths.get("src", "main", "resources", "META-INF", "mods.toml"))
-                            .equals(SOURCE_VERSION));
             check("版本一致: fabric.mod.json == " + SOURCE_VERSION,
                     versionOf(Paths.get("src", "fabric", "resources", "fabric.mod.json"))
                             .equals(SOURCE_VERSION));
             check("版本一致: BiliFixMod.VERSION == " + SOURCE_VERSION,
                     BiliFixModVersion().equals(SOURCE_VERSION));
+            // 死文件必须真的不在了：留着它会让用户解包 jar 时看到两个一模一样的
+            // 元数据文件，却只有一个生效
+            check("死文件已清理: src/main/resources/META-INF/mods.toml 不存在",
+                    !Files.exists(Paths.get("src", "main", "resources", "META-INF", "mods.toml")));
         }
         if (Files.exists(mixinsJson)) {
             String mixins = Files.readString(mixinsJson, StandardCharsets.UTF_8);

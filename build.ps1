@@ -458,7 +458,6 @@ Copy-Item "$OutDir\classes\dev" "$stage\dev" -Recurse -Force
 Copy-Item "$root\src\main\resources\bilifix.mixins.json" "$stage\" -Force
 Copy-Item "$root\src\main\resources\bilifix_logo.png" "$stage\" -Force
 Copy-Item "$root\src\main\resources\META-INF\neoforge.mods.toml" "$stage\META-INF\" -Force
-Copy-Item "$root\src\main\resources\META-INF\mods.toml" "$stage\META-INF\" -Force
 @"
 Manifest-Version: 1.0
 Implementation-Title: BiliFix
@@ -466,7 +465,7 @@ Implementation-Version: $version
 "@ | Out-File "$OutDir\MANIFEST.MF" -Encoding ascii
 Push-Location $stage
 # Naming convention: <mod>-<version>-mc<gameVersion>-<loader>.jar
-& $jar cfm "$OutDir\BiliFix-$version-mc1.21.1-neoforge.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json bilifix_logo.png META-INF/neoforge.mods.toml META-INF/mods.toml
+& $jar cfm "$OutDir\BiliFix-$version-mc1.21.1-neoforge.jar" "$OutDir\MANIFEST.MF" dev bilifix.mixins.json bilifix_logo.png META-INF/neoforge.mods.toml
 Pop-Location
 # Post-build jar integrity check: read EVERY entry fully via .NET ZipArchive (strict path,
 # matching how FML consumes jars). Catches corrupted central directories at build time
@@ -490,6 +489,43 @@ $total = $zc.Entries.Count
 $zc.Dispose()
 if ($failCount -gt 0) { throw "jar integrity check FAILED: $failCount of $total entries corrupt" }
 Write-Host "Jar integrity: $total/$total entries OK" -ForegroundColor Green
+
+    # Jar metadata probe: check the PACKAGED artefact, not the source.
+    # Which loader metadata file is inside, what the mixin
+    # compatibilityLevel says and whether the mod classes are present are
+    # all decided at packaging time - none of it is visible in the source
+    # tree. The NeoForge jar once carried a dead META-INF/mods.toml that
+    # no loader ever reads (FML loader 4.0.45's ModFileParser only knows
+    # "META-INF/neoforge.mods.toml").
+    if (Test-Path (Join-Path $root 'src\test\java\JarMetadataProbe.java')) {
+        $jmOut = Join-Path $OutDir 'jarmeta-probe'
+        New-Item -ItemType Directory -Force -Path $jmOut | Out-Null
+        & $javac -encoding UTF-8 -proc:none -d $jmOut (Join-Path $root 'src\test\java\JarMetadataProbe.java')
+        if ($LASTEXITCODE -ne 0) { throw 'Jar metadata probe compile failed' }
+        # Check EVERY packaged jar, not just this script's own. The probe
+        # infers the loader from the jar's own contents, so the order
+        # does not matter. A jar that is not built yet is simply skipped -
+        # running only build.ps1 on a fresh checkout must not fail here.
+            # Find the packaged jars by glob, not by a hard-coded name: the
+            # version variable is $version in one script and $ver in the other
+            # two, and each has a different output directory. A probe that
+            # silently finds nothing and skips is worse than no probe.
+            $jmArgs = @('-cp', $jmOut, 'JarMetadataProbe')
+            foreach ($jmJar in @(Get-ChildItem (Join-Path $root 'build') -Recurse -Filter 'BiliFix-*.jar' -ErrorAction SilentlyContinue)) {
+                $jmArgs += $jmJar.FullName
+            }
+            if ($jmArgs.Count -le 3) {
+                Write-Host 'Jar metadata probe SKIPPED: no packaged jar to check yet' -ForegroundColor Yellow
+            } else {
+                $jmP = Start-Process -FilePath $javaExe -ArgumentList $jmArgs `
+                        -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+                        -RedirectStandardOutput (Join-Path $jmOut 'stdout.txt') -RedirectStandardError (Join-Path $jmOut 'stderr.txt')
+                Get-Content (Join-Path $jmOut 'stdout.txt') -ErrorAction SilentlyContinue |
+                    Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+                if ($jmP.ExitCode -ne 0) { throw 'Jar metadata probe FAILED (the packaged jar is wrong)' }
+                Write-Host 'Jar metadata probe OK' -ForegroundColor Green
+            }
+    }
 Write-Host "Packaged: $jarOut ($((Get-Item $jarOut).Length) bytes)" -ForegroundColor Green
 # Housekeeping: remove older-version jars from build/ (all published versions are recoverable from source)
 Get-ChildItem "$OutDir" -Filter 'BiliFix-*-mc*.jar' | Where-Object { $_.Name -ne (Split-Path $jarOut -Leaf) } | Remove-Item -Force -ErrorAction SilentlyContinue

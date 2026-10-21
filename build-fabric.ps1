@@ -1,4 +1,4 @@
-# build-fabric.ps1 - build the Fabric 1.20.1 variant of BiliFix
+﻿# build-fabric.ps1 - build the Fabric 1.20.1 variant of BiliFix
 #
 # Why this variant needs a staging step at all:
 #   src/main/java/* is compiled against NeoForge by build.ps1, and the class
@@ -445,6 +445,41 @@ try {
     Get-Content "$nwDir\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
     if ($nwP.ExitCode -ne 0) { throw 'Normalized warning probe FAILED' }
     Write-Host 'Normalized warning probe OK' -ForegroundColor Green
+# Real arguments probe (v1.4.8). Every earlier check used HAND-WRITTEN
+# parameter tables. This one uses the table watermedia actually ships
+# (videolan/arguments.json, read out of the real jar) and runs the
+# PRODUCTION rewrite on it. The real table carries
+#   "--vout", "direct3d11,glwin32,gl,any"
+#   "--avcodec-hw", "d3d11va,dxva2,any"
+# which is exactly the D3D11VA copy-back path that kills the JVM.
+# The real watermedia jar is optional: without it the jar-level checks
+# are skipped, the table-level checks still run.
+# Locate the real watermedia jar. The folder name contains non-ASCII
+# characters, and this script may be read without a BOM (which would make
+# a literal path unreadable), so the lookup must NOT depend on a
+# hard-coded non-ASCII literal. Search by FILE NAME instead.
+$wmJar = $null
+$wmRoots = @('D:\PCL2\.minecraft\versions', 'D:\PCL2\.minecraft\mods')
+foreach ($r in $wmRoots) {
+    if (-not (Test-Path $r)) { continue }
+    $hit = Get-ChildItem $r -Recurse -Filter 'watermedia-*.jar' -ErrorAction SilentlyContinue |
+            Sort-Object Length -Descending | Select-Object -First 1
+    if ($hit) { $wmJar = $hit.FullName; break }
+}
+if ((Test-Path "$root\src\test\java\RealArgumentsProbe.java") -and (Test-Path $mixinForAr)) {
+    $raOut = Join-Path $OutDir 'realargs-probe'
+    New-Item -ItemType Directory -Force -Path $raOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$(Join-Path $OutDir 'classes');$mixinForAr;$slf4jForGpu" -d $raOut "$root\src\test\java\RealArgumentsProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw 'Real arguments probe compile failed' }
+    $raArgs = @('-cp', "$raOut;$(Join-Path $OutDir 'classes');$mixinForAr;$slf4jForGpu", 'RealArgumentsProbe')
+    if ($wmJar) { $raArgs += $wmJar }
+    $raP = Start-Process -FilePath $javaExe -ArgumentList $raArgs `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$raOut\stdout.txt" -RedirectStandardError "$raOut\stderr.txt"
+    Get-Content "$raOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|\[SKIP\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($raP.ExitCode -ne 0) { throw 'Real arguments probe FAILED (the production rewrite does not neutralise the REAL watermedia parameter table)' }
+    Write-Host 'Real arguments probe OK' -ForegroundColor Green
+}
 
     # Null element probe: a null entry in the argument array must not make the
     # hardening logic throw. JarTool.readArray is a GENERAL method - watermedia

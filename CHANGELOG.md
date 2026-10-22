@@ -155,6 +155,17 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **工作树守卫第一次真的抓到事故**（`dcdfcee` 之后的验证轮）：
+  - 跑一次 `build.ps1` 后，三个**新建/新改**的测试脚本
+    （`neg-ffwarn.ps1` / `run-all-negative-tests.ps1` / `sim-ci-runner.ps1`）
+    从工作树**消失了**——git 里完好，`git checkout --` 恢复
+  - 守卫在跑后对比 SHA256 快照时**当场报出**：
+    `消失/变更前: <hash> src/test/negative/neg-ffwarn.ps1`，EXIT=1
+  - 复现尝试（单独跑 neg-ffwarn → 无删除；完整 build → 无删除）**均无法再现**：
+    判定为开发过程中某个中间态脚本（neg-ffwarn 的路径修复过程）误删，
+    **孤立事故**，不是稳定 bug
+  - 结论：守卫的"跑后对比"设计被证明有价值——它把一次"无声的数据丢失"
+    变成了带哈希与文件名的明确报告
 - **取证失败此前是完全静默的**（`Unreleased`）：
   - `CrashSentinel` 的取证写文件全部包在 `catch (Throwable ignored)` 里——守护不能
     搞崩游戏，这个原则对；但**完全静默**同样错：诊断文件是原生崩溃后 Java 侧

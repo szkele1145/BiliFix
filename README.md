@@ -76,6 +76,12 @@ is the last Java-side evidence — attach it to your crash report.
 The startup diagnostics also report the exact companion-chain versions
 (watermedia / bilibili_media / waterframes).
 
+> **A failed forensic write says so.** If `bilifix-diagnostic.txt` cannot be
+> written (read-only directory, full disk, an antivirus holding the file), the log
+> shows a `[BiliFix] ⚠ 取证失败 (...)` warning instead of staying silent. That
+> line means "there is no diagnostic file after the next crash" is not BiliFix
+> failing to record anything — the recording itself could not be saved.
+
 ## Install
 
 1. Download the jar for your loader into your `mods` folder:

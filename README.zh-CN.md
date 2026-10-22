@@ -73,6 +73,11 @@ verbose = false
 
 启动日志的诊断区还会报出前置链路的精确版本（watermedia / bilibili_media / waterframes）。
 
+> **取证失败会明确告知**：如果 `bilifix-diagnostic.txt` 写不出来（目录只读、磁盘满、
+> 杀毒软件锁文件），日志里会出现一条
+> `[BiliFix] ⚠ 取证失败（...）` 警告，而不是**悄无声息**。
+> 看到这条就说明"下次崩溃时没有诊断文件"不是 BiliFix 没记录，而是**记录本身没写成功**。
+
 ## 安装
 
 1. 下载对应加载器的 jar 放进 `mods` 目录：

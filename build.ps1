@@ -349,6 +349,26 @@ if (Test-Path "$root\src\test\java\StartupLogTruthProbe.java") {
     if ($ukP.ExitCode -ne 0) { throw "Unknown config key probe FAILED (a mistyped config key is silently ignored)" }
     Write-Host "Unknown config key probe OK" -ForegroundColor Green
 
+    # Config invalid-value probe: the three config fields must treat invalid
+    # values the SAME way. hwDecoder warned on unknown values and vout warned
+    # on an empty value, but verbose = "yes" was silently turned into false -
+    # the user saw "config loaded" and had no clue why their setting did not
+    # apply. Also: a duplicated key was silently overwritten.
+    # Reuses the capturing slf4j provider compiled for the unknown-key probe.
+    $civOut = "$OutDir\configinvalid-probe"
+    New-Item -ItemType Directory -Force -Path $civOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$ukOut;$OutDir\classes;$slf4jJar" -d $civOut "$root\src\test\java\ConfigInvalidValueProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Config invalid-value probe compile failed" }
+    $civP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$civOut;$ukOut;$OutDir\classes;$slf4jJar", 'ConfigInvalidValueProbe', "$root\src\main\java\dev\polaris_fix\bilifix\config\BiliFixConfig.java") `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$civOut\stdout.txt" -RedirectStandardError "$civOut\stderr.txt"
+    Get-Content "$civOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($civP.ExitCode -ne 0) {
+        Get-Content "$civOut\stderr.txt" -ErrorAction SilentlyContinue | Select-Object -Last 10 | ForEach-Object { Write-Host $_ }
+        throw "Config invalid-value probe FAILED (an invalid config value is silently accepted)"
+    }
+    Write-Host "Config invalid-value probe OK" -ForegroundColor Green
+
     # Config default probe: the default values (none / gl,any / false) used to be
     # hard-coded in FOUR places - the field initialisers, the load() exception
     # reset, the file written to the user, and the unknown-value fallback. Any one

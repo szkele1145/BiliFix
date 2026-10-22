@@ -155,6 +155,22 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **配置里三个字段对无效值的处理不一致**（代码审查发现，`Unreleased`）：
+  - `hwDecoder` 未知值会警告、`vout` 空值会警告，但 **`verbose` 的无效值
+    （`"yes"` / `"1"` / `"on"` / 拼错的 `"ture"`）被静默变成 false**。
+    这正是 `BiliFixConfig.voutValue()` 注释自己指出的问题："两个字段行为不一致，
+    早晚会有人踩到"。用户写 `verbose = "yes"` 后看到的是"配置加载成功"，
+    详细日志没开，却没有任何线索指向原因
+    - 修复：新增 `parseBoolean(String)`——只接受 `true` / `false`（忽略大小写），
+      非法值回退 `false`（安全默认 = 少刷屏）并**警告**；
+      新增 `verboseValue()` 与 `hwDecoderValue()` / `voutValue()` 对称
+  - **重复键静默覆盖**：同一个键写两次时后者生效（与 TOML 一致），但**没有任何
+    提示**——用户改不动配置时无从判断是哪一行在起作用
+    - 修复：`parse()` 记录重复的键，`load()` 统一警告"只有最后一个生效，
+      请删掉多余的行"；重复的未知键同样会被指出
+  - **探针**：`ConfigInvalidValueProbe`（14 条断言，含"三个字段处理一致"与
+    "合法值不被误报"两组断言）
+  - **负向测试**：`neg-cfginvalid.ps1`（两个**独立**破坏，各让探针失败 4 / 3 条断言）
 - **环境诊断里两个静默失效点**（代码审查发现，`Unreleased`）：
   - **REG_EXPAND_SZ 的值被静默丢弃**：`regQueryValue` 的 javadoc 明确声称支持
     REG_SZ 与 REG_EXPAND_SZ，但实现只找字面量 `"REG_SZ"`——`"REG_EXPAND_SZ"`

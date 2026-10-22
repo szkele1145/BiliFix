@@ -94,7 +94,15 @@ public final class BiliFixConfig {
                 Map<String, String> kv = parse(path);
                 if (kv.containsKey("hwDecoder")) hwDecoder = kv.get("hwDecoder");
                 if (kv.containsKey("vout"))      vout      = kv.get("vout");
-                if (kv.containsKey("verbose"))  verbose   = "true".equalsIgnoreCase(kv.get("verbose"));
+                if (kv.containsKey("verbose"))  verbose   = parseBoolean(kv.get("verbose"));
+                // 重复键必须可见（v1.4.8 审查发现）：同一个键写两次时后者生效，
+                // 但用户改不动配置时无从判断是哪一行在起作用。重复键静默覆盖
+                // 与"未知键被静默忽略"是同族缺陷。
+                for (String dup : DUPLICATE_KEYS) {
+                    BiliFixMod.LOGGER.warn("[BiliFix] 配置里的键 '{}' 重复出现了多次，"
+                            + "只有最后一个生效——请删掉多余的行", dup);
+                }
+                DUPLICATE_KEYS.clear();
                 // 未识别的 key 警告：写错的配置必须可见，否则就是又一条静默失效路径
                 // （与 UTF-8 BOM 同族——用户写了配置、文件也"加载成功"、但设置没生效，
                 // 且日志里没有任何指向原因的线索）。
@@ -115,6 +123,7 @@ public final class BiliFixConfig {
                 // 触发一次校验，让无效值在启动时就发出警告
                 hwDecoderValue();
                 voutValue();
+                verboseValue();
                 BiliFixMod.LOGGER.info("[BiliFix] 已加载配置: {}", path);
             }
         } catch (Exception e) {
@@ -126,6 +135,42 @@ public final class BiliFixConfig {
             verbose = DEFAULT_VERBOSE;
             BiliFixMod.LOGGER.warn("[BiliFix] 配置加载失败，已重置为默认值（软解）: {}", e.toString());
         }
+    }
+
+    /**
+     * 解析布尔配置值：只有 {@code true} / {@code false}（忽略大小写）合法。
+     *
+     * <p><b>为什么要单独一个方法</b>（v1.4.8 审查发现）：旧实现是
+     * {@code verbose = "true".equalsIgnoreCase(v)}——除了 true/false 之外的
+     * 任何值（{@code "yes"}、{@code "1"}、{@code "on"}、拼错的 {@code "ture"}）
+     * 都<b>静默</b>变成 false。而 {@code hwDecoder} 的未知值会警告、
+     * {@code vout} 的空值也会警告——三个字段行为不一致，正是
+     * {@link #voutValue()} 注释里说的"两个字段行为不一致，早晚会有人踩到"。
+     * 用户写 {@code verbose = "yes"} 后看到的是"配置加载成功"，
+     * 详细日志没开，却没有任何线索指向原因。</p>
+     *
+     * <p>非法值一律回退 {@code false}（不打开详细日志 = 安全默认，
+     * 少刷屏）并给出警告。</p>
+     */
+    static boolean parseBoolean(String raw) {
+        if (raw == null) return DEFAULT_VERBOSE;
+        String v = raw.trim();
+        if (v.equalsIgnoreCase("true")) return true;
+        if (v.equalsIgnoreCase("false")) return false;
+        BiliFixMod.LOGGER.warn("[BiliFix] verbose 配置值 '{}' 不是合法的布尔值"
+                + "（只接受 true / false），已回退到 {}", raw, DEFAULT_VERBOSE);
+        return DEFAULT_VERBOSE;
+    }
+
+    /**
+     * verbose 的最终生效值。
+     *
+     * <p>与 {@link #hwDecoderValue()} / {@link #voutValue()} 对称：无效值在这里
+     * 被识别并警告，而不是在解析时静默吞掉。{@code load()} 会调用一次，
+     * 让问题在启动时就可见。</p>
+     */
+    public static boolean verboseValue() {
+        return verbose;
     }
 
     /** hwDecoder 的最终 VLC 参数值："disable" 与 "none" 等价；未知值回退 none 并警告 */
@@ -193,10 +238,25 @@ public final class BiliFixConfig {
             if (eq <= 0) continue;
             String k = s.substring(0, eq).trim();
             String v = stripValue(s.substring(eq + 1).trim());
+            // 重复键检测（v1.4.8）：同一个键出现多次时后者生效（与 TOML 一致），
+            // 但静默覆盖会让用户改不动配置时无从判断是哪一行在起作用。
+            // 记下来，由 load() 统一警告。
+            if (kv.containsKey(k) && !DUPLICATE_KEYS.contains(k)) {
+                DUPLICATE_KEYS.add(k);
+            }
             kv.put(k, v);
         }
         return kv;
     }
+
+    /**
+     * 最近一次 parse() 发现的重复键。
+     *
+     * <p>用 {@link List} 而不是直接返回给调用方：{@code parse()} 的返回类型
+     * 是 {@code Map<String,String>}，塞不进重复信息又不破坏既有签名
+     * （{@code ConfigParseProbe} 等探针直接调用它）。</p>
+     */
+    private static final List<String> DUPLICATE_KEYS = new ArrayList<>();
 
     /**
      * 提取配置值：支持引号内嵌 '#'、引号后行内注释两种 TOML 常见写法。

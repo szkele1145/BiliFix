@@ -129,9 +129,14 @@ public final class EnvironmentDiagnostics {
                 args.add(valueName);
             }
             Process p = new ProcessBuilder(args).redirectErrorStream(true).start();
-            // 后台线程读流防死锁（管道缓冲区满时 waitFor 会与读流互相等待）
+            // 后台线程读流防死锁（管道缓冲区满时 waitFor 会与读流互相等待）。
+            // <b>并发安全（v1.4.8 修复）</b>：这里必须是并发容器。
+            // t.join(500) 超时返回时<b>不建立</b> happens-before——主线程随后读
+            // lines 时，后台线程可能还在写。普通 ArrayList 在别的线程写的同时
+            // 被读是数据竞争（可能读到 null 元素或抛
+            // ConcurrentModificationException），CopyOnWriteArrayList 则安全。
+            var lines = new java.util.concurrent.CopyOnWriteArrayList<String>();
             var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
-            var lines = new java.util.ArrayList<String>();
             var t = new Thread(() -> {
                 try {
                     String line;
@@ -144,6 +149,9 @@ public final class EnvironmentDiagnostics {
             // 3 秒超时保护
             if (!p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
                 p.destroyForcibly();
+                // 销毁后读流线程很快到 EOF，join 它：保证退出前没有别的线程
+                // 仍在写 lines（虽然容器已安全，join 让"借出去"的数据完整）
+                t.join(500);
                 return out;
             }
             t.join(500);
@@ -161,14 +169,44 @@ public final class EnvironmentDiagnostics {
      */
     private static String regQueryValue(String key, String valueName) {
         for (String line : regQuery(key, valueName)) {
-            if (!line.contains(valueName)) continue;
-            int i = line.indexOf("REG_SZ");
-            if (i < 0) continue;
-            String value = line.substring(i + "REG_SZ".length()).trim();
-            // reg 对 REG_SZ 输出 "    <value>"，去掉前导分隔空格即可
-            if (!value.isEmpty()) return value;
+            String value = parseRegValue(line, valueName);
+            if (value != null) return value;
         }
         return null;
+    }
+
+    /**
+     * 从一行 {@code reg query /v} 输出里解析出指定值名的字符串值。
+     *
+     * <p><b>纯函数（v1.4.8 修复）</b>：解析规则从 {@code regQuery} 的 I/O 里
+     * 剥出来，才能被探针直接测——原来 regQueryValue 只能在真机上靠碰巧
+     * 出现的注册表内容验证。</p>
+     *
+     * <p><b>REG_EXPAND_SZ（v1.4.8 修复）</b>：旧实现只找字面量
+     * {@code "REG_SZ"}，遇到 {@code REG_EXPAND_SZ} 时 {@code indexOf} 返回
+     * -1（{@code "REG_EXPAND_SZ"} 里并不含连续的 {@code "REG_SZ"}），
+     * 于是这一行被静默跳过——但 javadoc 明确声称支持 REG_EXPAND_SZ。
+     * 驱动描述里出现 {@code %SystemRoot%} 之类需要展开的值并不罕见，
+     * 静默丢弃等于 GPU 型号显示不全。现在两种类型都认。</p>
+     *
+     * @param line      {@code reg query /v} 的一行输出
+     * @param valueName 要找的值名
+     * @return 解析出的值；这一行不含该值名 / 类型不识别 / 值为空时返回 null
+     */
+    static String parseRegValue(String line, String valueName) {
+        if (line == null || valueName == null) return null;
+        if (!line.contains(valueName)) return null;
+        // REG_EXPAND_SZ 必须先判：它含 "REG_EXPAND_SZ"，
+        // 但不含连续的 "REG_SZ"（REG_ + EXPAND_ + SZ）。
+        int i = line.indexOf("REG_EXPAND_SZ");
+        int typeLen = "REG_EXPAND_SZ".length();
+        if (i < 0) {
+            i = line.indexOf("REG_SZ");
+            typeLen = "REG_SZ".length();
+        }
+        if (i < 0) return null;
+        String value = line.substring(i + typeLen).trim();
+        return value.isEmpty() ? null : value;
     }
 
     private static boolean checkClass(String fqn) {

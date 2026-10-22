@@ -189,7 +189,7 @@ if (Test-Path "$root\src\test\java\GpuDetectProbe.java") {
     Get-Content "$gpuOut\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
     if ($gpuP.ExitCode -ne 0) { throw "GPU probe FAILED (detectGpu returned nothing - the GPU line never reaches the report)" }
     Write-Host "GPU probe OK" -ForegroundColor Green
-}
+
 
 # Argument rewrite probe (v1.4.8). The core of the fix is the argument
 # rewriting in JarToolMixin. Until now nothing actually EXECUTED it:
@@ -198,6 +198,28 @@ if (Test-Path "$root\src\test\java\GpuDetectProbe.java") {
 # CallbackInfoReturnable and checks the dangerous parameters are gone.
 $mixinJar = "$lib\org\spongepowered\mixin\0.8.5\mixin-0.8.5.jar"
 $slf4jJar = "$lib\org\slf4j\slf4j-api\2.0.7\slf4j-api-2.0.7.jar"
+
+    # Registry parse + concurrency probe: two silent-failure points found in
+    # code review. (1) regQueryValue's javadoc claimed REG_EXPAND_SZ support,
+    # but indexOf("REG_SZ") returns -1 on a REG_EXPAND_SZ line, so the value
+    # was silently dropped. (2) regQuery's background reader thread wrote
+    # into a plain ArrayList which the main thread reads right after a
+    # TIMED-OUT join() - a join timeout establishes no happens-before, so
+    # that read races with the writes.
+    $rpcOut = "$OutDir\regparse-concurrency-probe"
+    New-Item -ItemType Directory -Force -Path $rpcOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $rpcOut "$root\src\test\java\RegParseAndConcurrencyProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Reg parse + concurrency probe compile failed" }
+    $rpcP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$rpcOut;$OutDir\classes;$slf4jJar", 'RegParseAndConcurrencyProbe') `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$rpcOut\stdout.txt" -RedirectStandardError "$rpcOut\stderr.txt"
+    Get-Content "$rpcOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|\[PASS\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($rpcP.ExitCode -ne 0) {
+        Get-Content "$rpcOut\stderr.txt" -ErrorAction SilentlyContinue | Select-Object -Last 10 | ForEach-Object { Write-Host $_ }
+        throw "Reg parse + concurrency probe FAILED"
+    }
+    Write-Host "Reg parse + concurrency probe OK" -ForegroundColor Green
+}
 if ((Test-Path "$root\src\test\java\ArgumentRewriteProbe.java") -and (Test-Path $mixinJar)) {
     $arOut = "$OutDir\arg-probe"
     New-Item -ItemType Directory -Force -Path $arOut | Out-Null
@@ -507,7 +529,6 @@ $total = $zc.Entries.Count
 $zc.Dispose()
 if ($failCount -gt 0) { throw "jar integrity check FAILED: $failCount of $total entries corrupt" }
 Write-Host "Jar integrity: $total/$total entries OK" -ForegroundColor Green
-
 
 # Housekeeping: remove OLDER-VERSION jars from build/ (all published versions
 # are recoverable from source).

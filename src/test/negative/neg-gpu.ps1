@@ -109,8 +109,10 @@ if ($LASTEXITCODE -ne 0) { Write-Host 'REVERT_COMPILE_FAILED'; exit 1 }
 & $javac -encoding UTF-8 -proc:none -cp "$tmp\out;$cp" -d "$tmp\out" "$d\src\test\java\GpuDetectProbe.java" 2>&1 | Select-Object -First 5 | ForEach-Object { "  $($_.ToString())" }
 if ($LASTEXITCODE -ne 0) { Write-Host 'PROBE_COMPILE_FAILED'; exit 1 }
 
-# Run the probe against the reverted code - it MUST fail
-$proc = Start-Process -FilePath $java -ArgumentList @('-cp', "$tmp\out;$cp", 'GpuDetectProbe') `
+# Run the probe against the reverted code - it MUST fail.
+# The reverted SOURCE PATH is passed to the probe so its source-level
+# assertions look at the broken copy, not at the repository original.
+$proc = Start-Process -FilePath $java -ArgumentList @('-cp', "$tmp\out;$cp", 'GpuDetectProbe', $target) `
         -NoNewWindow -Wait -PassThru -WorkingDirectory $d `
         -RedirectStandardOutput "$tmp\stdout.txt" -RedirectStandardError "$tmp\stderr.txt"
 Get-Content "$tmp\stdout.txt" -ErrorAction SilentlyContinue | ForEach-Object { "  $($_.ToString())" }

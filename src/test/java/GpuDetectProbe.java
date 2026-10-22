@@ -72,9 +72,14 @@ public class GpuDetectProbe {
         check("重复调用结果一致（稳定，非偶发）", gpu == null ? gpu2 == null : gpu.equals(gpu2));
 
         // 6. 源码级：不得再出现对父键直接 /v DriverDesc 的调用形态
-        String src = new String(java.nio.file.Files.readAllBytes(
-                java.nio.file.Paths.get("src", "main", "java", "dev", "polaris_fix",
-                        "bilifix", "EnvironmentDiagnostics.java")),
+        // 源码路径可由命令行传入——负向测试要把**被破坏的副本**传进来，
+        // 否则源级断言读的是仓库里的原版，破坏根本进不了探针的视野
+        // （"破坏没被发现"会被误读成"探针没测到"或"这不算缺陷"）。
+        java.nio.file.Path srcPath = args.length > 0
+                ? java.nio.file.Path.of(args[0])
+                : java.nio.file.Paths.get("src", "main", "java", "dev", "polaris_fix",
+                        "bilifix", "EnvironmentDiagnostics.java");
+        String src = new String(java.nio.file.Files.readAllBytes(srcPath),
                 java.nio.charset.StandardCharsets.UTF_8);
         check("源码含 CLASS_KEY_GUID 常量（子键查询的前提）", src.contains("CLASS_KEY_GUID"));
         check("源码含 regQueryValue（逐子键取值）", src.contains("regQueryValue"));

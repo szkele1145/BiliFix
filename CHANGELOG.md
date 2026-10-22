@@ -155,6 +155,28 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **环境诊断里两个静默失效点**（代码审查发现，`Unreleased`）：
+  - **REG_EXPAND_SZ 的值被静默丢弃**：`regQueryValue` 的 javadoc 明确声称支持
+    REG_SZ 与 REG_EXPAND_SZ，但实现只找字面量 `"REG_SZ"`——`"REG_EXPAND_SZ"`
+    里并不含连续的 `"REG_SZ"`（是 `REG_` + `EXPAND_` + `SZ`），`indexOf` 返回
+    -1，那一行被静默跳过。驱动描述里带 `%SystemRoot%` 这类需展开的值并不罕见，
+    静默丢弃 = GPU 型号显示不全而无人察觉
+    - 修复：解析逻辑提取为**纯函数** `parseRegValue(line, valueName)`，
+      两种类型都认；纯函数化后**可以被探针直接测**（原来只能在真机上靠碰巧的
+      注册表内容验证）
+  - **`regQuery` 的数据竞争**：后台线程读进程输出写进普通 `ArrayList`，
+    主线程 `t.join(500)` 超时后立刻读它——`join` 超时**不建立 happens-before**，
+    这次读与后台线程的写并发（可能读到 null 元素或抛
+    `ConcurrentModificationException`）
+    - 修复：改用 `CopyOnWriteArrayList`；超时时也 join 读流线程
+  - **探针**：`RegParseAndConcurrencyProbe`（12 条断言，含"普通 ArrayList 确实
+    会出问题"的行为级实证 + "无并发时同一套流程不报错"的反向自检）
+  - **负向测试**：`neg-regparse.ps1`（两个**独立**破坏，各让探针失败 1 / 2 条断言）
+  - **顺带修好的探针盲区**：负向测试若不把**被破坏的源码路径**传给探针，
+    探针的源级断言读的是仓库原版——破坏根本进不了探针的视野，
+    "破坏没被发现"会被误读成"这不算缺陷"。`GpuDetectProbe` /
+    `RegParseAndConcurrencyProbe` 现在都接受源码路径参数，
+    `neg-gpu.ps1` 修复后失败断言从 2 条增至 4 条
 - **工作树守卫第一次真的抓到事故**（`dcdfcee` 之后的验证轮）：
   - 跑一次 `build.ps1` 后，三个**新建/新改**的测试脚本
     （`neg-ffwarn.ps1` / `run-all-negative-tests.ps1` / `sim-ci-runner.ps1`）

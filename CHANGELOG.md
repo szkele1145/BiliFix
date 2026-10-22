@@ -155,6 +155,18 @@
       ② 把 `compatibilityLevel` 改成 `JAVA_18` → 探针两次都失败（exit 1），
       **证明探针抓得住它声称覆盖的问题**
   - 证据分级：jar 级（本地构建后全跑）vs CI（不打包 → 明确 SKIP 并计入"跳过"）
+- **取证失败此前是完全静默的**（`Unreleased`）：
+  - `CrashSentinel` 的取证写文件全部包在 `catch (Throwable ignored)` 里——守护不能
+    搞崩游戏，这个原则对；但**完全静默**同样错：诊断文件是原生崩溃后 Java 侧
+    **唯一**的线索，写不出来（目录只读 / 磁盘满 / 杀毒软件锁文件）时，用户会在
+    "下次崩溃"发现根本没有 `bilifix-crash.txt`，却没有任何说明为什么
+  - 修复：三处取证失败（会话标记 / 退出诊断文件 / 异常终止报告）现在打**一次**
+    警告；用 `AtomicBoolean` 保证退出 hook 重跑时不刷屏
+  - `warnForensicsOnce` 的 logger 做成**参数**：生产传 `BiliFixMod.LOGGER`，
+    探针传"记录 warn 调用的替身"——`BiliFixMod.LOGGER` 是 `public static final`，
+    探针换不了它
+  - **探针**：`ForensicsFailureWarnProbe`（10 条断言，源码级 6 + 行为级 4）
+  - **负向测试**：`neg-ffwarn.ps1`（两个**独立**破坏，各让探针失败 3 条断言）
 - **CI 现在会检查"编码卫生"**（`6aba884`）：所有含非 ASCII 字符的 `.ps1`
   **必须带 UTF-8 BOM**，且所有 `.ps1` **必须能解析**
   - 原因：WinPS 5.1 读无 BOM 的 `.ps1` 会按 ANSI 读 → 中文乱码 →

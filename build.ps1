@@ -290,6 +290,24 @@ if (Test-Path "$root\src\test\java\StartupLogTruthProbe.java") {
     if ($fvP.ExitCode -ne 0) { throw "Forensics vout probe FAILED (the diagnostics file misreports the vout strategy)" }
     Write-Host "Forensics vout probe OK" -ForegroundColor Green
 
+    # Forensics failure warning probe: when the forensics file cannot be
+    # written, the user must be told. The diagnostics file is the ONLY thing
+    # Java leaves behind after a native crash - if it cannot be written and
+    # nothing says so, "there is no bilifix-crash.txt" is a dead end.
+    $ffwOut = "$OutDir\forensicsfailwarn-probe"
+    New-Item -ItemType Directory -Force -Path $ffwOut | Out-Null
+    & $javac -encoding UTF-8 -proc:none -cp "$OutDir\classes;$slf4jJar" -d $ffwOut "$root\src\test\java\ForensicsFailureWarnProbe.java"
+    if ($LASTEXITCODE -ne 0) { throw "Forensics failure warning probe compile failed" }
+    $ffwP = Start-Process -FilePath $javaExe -ArgumentList @('-cp', "$ffwOut;$OutDir\classes;$slf4jJar", 'ForensicsFailureWarnProbe', "$root\src\main\java\dev\polaris_fix\bilifix\CrashSentinel.java") `
+            -NoNewWindow -Wait -PassThru -WorkingDirectory $root `
+            -RedirectStandardOutput "$ffwOut\stdout.txt" -RedirectStandardError "$ffwOut\stderr.txt"
+    Get-Content "$ffwOut\stdout.txt" -ErrorAction SilentlyContinue | Select-String -Pattern '\[FAIL\]|通过 \d+|RESULT' | ForEach-Object { Write-Host $_ }
+    if ($ffwP.ExitCode -ne 0) {
+        Get-Content "$ffwOut\stderr.txt" -ErrorAction SilentlyContinue | Select-Object -Last 10 | ForEach-Object { Write-Host $_ }
+        throw "Forensics failure warning probe FAILED (a silent forensics failure leaves no trace)"
+    }
+    Write-Host "Forensics failure warning probe OK" -ForegroundColor Green
+
     # Unknown config key probe: a mistyped config key must be VISIBLE, not silently dropped.
     # Needs the capturing slf4j provider on the test classpath: slf4j-api without a
     # provider degrades to a NOP logger, so BiliFixMod.LOGGER.warn(...) produces

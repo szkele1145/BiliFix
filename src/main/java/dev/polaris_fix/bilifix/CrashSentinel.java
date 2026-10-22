@@ -102,6 +102,17 @@ public final class CrashSentinel {
 
     private static volatile boolean registered = false;
 
+    /**
+     * 取证失败是否已经告警过。
+     *
+     * <p>取证写文件失败时不能抛（守护不能反过来搞崩游戏），但也**不能完全静默**——
+     * 诊断文件是原生崩溃后 Java 侧唯一的线索，写不出来时用户必须知道，
+     * 否则"下次崩溃没有 {@code bilifix-crash.txt}"就成了又一条静默失效路径。
+     * 用原子标志保证每次失败最多一条警告，不刷屏。</p>
+     */
+    private static final java.util.concurrent.atomic.AtomicBoolean FORENSICS_WARNED =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
     /** 上次会话探测只做一次：重复构造时第二次会看到本次刚写的 lock，误报为崩溃 */
     private static volatile boolean probed = false;
 
@@ -216,8 +227,9 @@ public final class CrashSentinel {
                     content.getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
             // 标记失败只会让"上次异常终止"的判定失效，不影响游戏运行
+            warnForensicsOnce(BiliFixMod.LOGGER, "会话标记", t);
         }
     }
 
@@ -265,8 +277,9 @@ public final class CrashSentinel {
             Files.write(out, sb.toString().getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
             // 守护绝不能影响退出流程
+            warnForensicsOnce(BiliFixMod.LOGGER, "退出诊断文件", t);
         }
     }
 
@@ -322,8 +335,43 @@ public final class CrashSentinel {
                     sb.toString().getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
             // 写不出报告不影响游戏，也不影响日志里的同一条结论
+            warnForensicsOnce(BiliFixMod.LOGGER, "异常终止报告", t);
+        }
+    }
+
+    /**
+     * 取证失败时打一次警告。
+     *
+     * <p><b>为什么要"一次"</b>：取证代码全部包在 {@code catch (Throwable ignored)}
+     * 里——守护绝不能反过来搞崩游戏，这个原则是对的。但**完全静默**同样是错的：
+     * 诊断文件是原生崩溃后 Java 侧**唯一**留下的东西，如果它写不出来
+     * （目录只读、磁盘满、杀毒软件锁文件），用户会在"下次崩溃"时发现
+     * 根本没有 {@code bilifix-crash.txt}，却没有任何线索说明为什么——
+     * 又一条静默失效路径，与本项目一贯的原则相悖。</p>
+     *
+     * <p><b>为什么只打一次</b>：取证代码在退出 hook 里也会跑，失败时可能反复触发；
+     * 而 shutdown hook 里的日志未必来得及刷出去。这里用 {@code FORENSICS_WARNED}
+     * 原子标志保证每次失败最多一条警告，不会刷屏。</p>
+     *
+     * <p><b>为什么 logger 是参数</b>：{@code BiliFixMod.LOGGER} 是
+     * {@code public static final}，探针无法替换它（JDK 17+ 反射改 final 字段
+     * 不可靠）。把 logger 作为参数传入，生产路径传 {@code BiliFixMod.LOGGER}，
+     * 探针则可以传一个"记录 warn 调用"的替身，从而**行为级**验证这条告警
+     * 真的会发出、且只发一次——而不只是源码里出现了这个调用。</p>
+     *
+     * @param logger 日志器
+     * @param what   出错的是哪一步（给人看的）
+     * @param t      异常
+     */
+    static void warnForensicsOnce(org.slf4j.Logger logger, String what, Throwable t) {
+        if (!FORENSICS_WARNED.compareAndSet(false, true)) return;
+        try {
+            logger.warn("[BiliFix] ⚠ 取证失败（{}）：{} —— 崩溃后可能没有诊断文件，"
+                    + "排查时请留意这一点", what, t.toString());
+        } catch (Throwable ignored) {
+            // 连日志都打不出来时只能放弃：不能再抛
         }
     }
 }

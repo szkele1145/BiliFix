@@ -7,6 +7,15 @@
 # PowerShell 5.1 reads it as ANSI).
 $d = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath)))
 . (Join-Path (Split-Path -Parent $PSCommandPath) 'jdk.ps1')
+. (Join-Path (Split-Path -Parent $PSCommandPath) 'deps.ps1')
+# The negative tests compile a copy of the production sources, which import
+# org.slf4j / org.spongepowered - so the two dependency jars must be on the
+# classpath. They used to be taken from build\fabric\libs, a BUILD ARTIFACT:
+# on a fresh clone every negative test died with "package org.slf4j does not
+# exist" before running a single assertion. Initialize-DepJars fetches them
+# (cache / MC libraries / Maven) and fails loudly if it cannot.
+$depCp = Initialize-DepJars -RepoRoot $d
+if (-not $depCp) { Write-Host "依赖 jar 不可用（slf4j-api / mixin）——无法编译生产代码副本"; exit 1 }
 $jdkBin = Resolve-JdkBin -RepoRoot $d
 if (-not $jdkBin) { Write-Host "缺少 JDK（.tools\jdk21 或 JAVA_HOME）"; exit 1 }
 $javac = Join-Path $jdkBin 'javac.exe'

@@ -1,4 +1,4 @@
-﻿# Forge 1.20.1 variant builder.
+# Forge 1.20.1 variant builder.
 # Produces BiliFix-<version>-mc1.20.1-forge.jar from the SAME sources with 3 import
 # substitutions (net.neoforged.* -> net.minecraftforge.*) + Forge-flavored mods.toml.
 # Layout: src/main/java is shared; this script stages patched copies into build/forge.
@@ -83,6 +83,14 @@ Get-ChildItem $srcDir -Recurse -Filter '*.java' | ForEach-Object {
 #    MANIFEST MixinConfigs instead
 #  - dependency field is `mandatory=true`, NOT `type="required"`
 $toml = Get-Content (Join-Path $root 'src\main\resources\META-INF\neoforge.mods.toml') -Raw -Encoding UTF8
+# Strip a leading U+FEFF if the source file was saved as "UTF-8 with BOM".
+#
+# Get-Content -Raw -Encoding UTF8 KEEPS the BOM as a U+FEFF character, so
+# writing it back with UTF8Encoding($false) would still emit the BOM bytes.
+# A BOM in the published mods.toml makes the TOML parser throw
+# "Invalid bare key: '\uFEFFmodLoader'" -> the mod is rejected as invalid and
+# the whole ModLoader goes into a broken state. v1.4.7 was published that way.
+$toml = $toml -replace "^\uFEFF", ''
 $toml = $toml -replace 'loaderVersion = "\[4,\)"', 'loaderVersion = "[47,)"'
 $toml = $toml -replace 'versionRange = "\[21,\)"', 'versionRange = "[47,)"'   # neoforge dep
 $toml = $toml -replace 'modId = "neoforge"', 'modId = "forge"'
@@ -130,7 +138,15 @@ if ($mixinsTxt -match 'JAVA_21') { throw 'mixins.json still contains JAVA_21 aft
 [System.IO.File]::WriteAllText("$stage\bilifix.mixins.json", $mixinsTxt, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host 'mixins.json staged with compatibilityLevel=JAVA_17' -ForegroundColor Green
 Copy-Item (Join-Path $root 'src\main\resources\bilifix_logo.png') "$stage\" -Force
-[System.IO.File]::WriteAllText("$stage\META-INF\mods.toml", $toml, (New-Object System.Text.UTF8Encoding($false)))
+# Write the TOML as UTF-8 WITHOUT a BOM, then assert it. A BOM here makes the
+# TOML parser throw "Invalid bare key: '\uFEFFmodLoader'", the mod is rejected
+# as invalid, and the whole ModLoader goes into a broken state (v1.4.7 shipped
+# that way). The BOM is invisible in an editor, so the guard must be mechanical.
+$tomlBytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($toml)
+if ($tomlBytes.Length -ge 3 -and $tomlBytes[0] -eq 0xEF -and $tomlBytes[1] -eq 0xBB -and $tomlBytes[2] -eq 0xBF) {
+    throw 'staged mods.toml has a UTF-8 BOM - refusing to build'
+}
+[System.IO.File]::WriteAllBytes("$stage\META-INF\mods.toml", $tomlBytes)
 @"
 Manifest-Version: 1.0
 Implementation-Title: BiliFix

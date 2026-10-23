@@ -1,6 +1,27 @@
 # Changelog
 
-## Unreleased
+## 1.4.8 — 2026-10-23
+
+### 修复：打包产物里的 `META-INF/*.mods.toml` 带 UTF-8 BOM，导致 NeoForge 拒绝加载整个模组
+- **这是 1.4.7 发布出去的包就是坏的的原因**：1.4.7 的 `META-INF/neoforge.mods.toml`
+  与 `META-INF/mods.toml` 首部带 UTF-8 BOM（`EF BB BF`），NeoForge 的
+  nightconfig TOML 解析器把 BOM 当成键名的一部分，直接抛
+  `ParsingException: Invalid bare key: '锘縨odLoader'`，模组加载阶段报
+  `File mods\BiliFix-*.jar is not a valid mod file`
+- **故障链远不止于本模组**：预加载失败让整个 ModLoader 进入 broken mod state，
+  后续 40+ 个 NeoForge 事件被 `Cowardly refusing to send event ... to a broken mod
+  state` 拒绝 → **所有模组的配置都不会被加载** → 任何读取 `ModConfigSpec` 的代码
+  抛 `IllegalStateException: Cannot get config value before config is loaded`。
+  崩溃现场最显眼的栈是 `steam_achievements` 的 `SteamOverlay.render`，但它是
+  替罪羊：它只是恰好在"配置本该已加载"的阶段读了配置
+- **诊断要点**：BOM 在文件里不可见，日志里表现为 `锘縨odLoader` 这样的乱码键名；
+  崩溃信息指向的模组（steam_achievements）与真正的元凶（BiliFix）完全无关。
+  判据是 `Invalid bare key: '锘縨odLoader'` —— 出现这个就该去查发布产物的
+  `META-INF/*.mods.toml` 首字节
+- **修复**：打包时以 UTF-8 **无 BOM** 写出 `META-INF/*.mods.toml`
+  （`build-forge.ps1` / `build-fabric.ps1` 已用 `UTF8Encoding($false)`；
+  `build.ps1` 的 neoforge 变体同步对齐），并加断言防止回归
+- **注意**：已发布的 Modrinth 1.4.7 仍是带 BOM 的坏包。修复从 1.4.8 起生效
 
 ### 新增：Forge 1.20.1 变体（`BiliFix-<ver>-mc1.20.1-forge.jar`）
 - 适配 Forge 1.20.1 的三处 FML 分歧（详见 `docs/cross-loader-research.md`）：

@@ -1,4 +1,4 @@
-﻿# Build script (PowerShell, Windows)
+# Build script (PowerShell, Windows)
 # Requires: local Minecraft runtime JDK (javac/jar), NeoForge 21.1 libs, mixin 0.8.5, watermedia jar
 # Usage: ./build.ps1 [-WatermediaJar <path>] [-OutDir <dir>]
 #
@@ -517,7 +517,27 @@ $stage = "$OutDir\jar"
 Copy-Item "$OutDir\classes\dev" "$stage\dev" -Recurse -Force
 Copy-Item "$root\src\main\resources\bilifix.mixins.json" "$stage\" -Force
 Copy-Item "$root\src\main\resources\bilifix_logo.png" "$stage\" -Force
-Copy-Item "$root\src\main\resources\META-INF\neoforge.mods.toml" "$stage\META-INF\" -Force
+# The mods.toml must go into the jar as UTF-8 WITHOUT a BOM.
+#
+# Why this is written instead of Copy-Item: Copy-Item copies the source file's
+# BYTES, so a source file that some Windows editor saved as "UTF-8 with BOM"
+# would put that BOM straight into the published jar. NeoForge's nightconfig
+# TOML parser then reads the BOM as part of the first key and throws
+#   ParsingException: Invalid bare key: '\uFEFFmodLoader'
+# which surfaces as "File mods\BiliFix-*.jar is not a valid mod file" and
+# leaves the WHOLE ModLoader in a broken state - every mod's config fails to
+# load. v1.4.7 was published exactly that way; the crash report blamed an
+# unrelated mod (steam_achievements) that merely read a config value.
+#
+# So: re-encode explicitly, and assert the result. The BOM is invisible in an
+# editor, so the guard has to be mechanical.
+$tomlSrc = "$root\src\main\resources\META-INF\neoforge.mods.toml"
+$tomlText = [System.IO.File]::ReadAllText($tomlSrc, [System.Text.Encoding]::UTF8)
+$tomlBytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($tomlText)
+if ($tomlBytes.Length -ge 3 -and $tomlBytes[0] -eq 0xEF -and $tomlBytes[1] -eq 0xBB -and $tomlBytes[2] -eq 0xBF) {
+    throw "neoforge.mods.toml has a UTF-8 BOM after re-encoding - refusing to build"
+}
+[System.IO.File]::WriteAllBytes("$stage\META-INF\neoforge.mods.toml", $tomlBytes)
 @"
 Manifest-Version: 1.0
 Implementation-Title: BiliFix

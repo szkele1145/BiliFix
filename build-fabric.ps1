@@ -1,4 +1,4 @@
-﻿# build-fabric.ps1 - build the Fabric 1.20.1 variant of BiliFix
+# build-fabric.ps1 - build the Fabric 1.20.1 variant of BiliFix
 #
 # Why this variant needs a staging step at all:
 #   src/main/java/* is compiled against NeoForge by build.ps1, and the class
@@ -161,7 +161,19 @@ if ($mixinsTxt -notmatch '"compatibilityLevel"\s*:\s*"JAVA_21"') {
 $mixinsTxt = $mixinsTxt -replace '"compatibilityLevel"\s*:\s*"JAVA_21"', '"compatibilityLevel": "JAVA_17"'
 if ($mixinsTxt -match 'JAVA_21') { throw 'mixins.json still contains JAVA_21 after downgrade' }
 [System.IO.File]::WriteAllText((Join-Path $pkg 'bilifix.mixins.json'), $mixinsTxt, $utf8NoBom)
-Copy-Item (Join-Path $root 'src\fabric\resources\fabric.mod.json') $pkg -Force
+# Re-encode fabric.mod.json without a BOM instead of Copy-Item: Copy-Item
+# copies the source BYTES, so a source file saved as "UTF-8 with BOM" would
+# put that BOM into the published jar. Fabric's JSON parser rejects a
+# leading BOM outright, and a BOM in the TOML/JSON metadata of a NeoForge-style
+# mod also breaks the loader. The BOM is invisible in an editor, so the guard
+# has to be mechanical.
+$fmjSrc = Join-Path $root 'src\fabric\resources\fabric.mod.json'
+$fmjText = [System.IO.File]::ReadAllText($fmjSrc, [System.Text.Encoding]::UTF8) -replace "^\uFEFF", ''
+$fmjBytes = $utf8NoBom.GetBytes($fmjText)
+if ($fmjBytes.Length -ge 3 -and $fmjBytes[0] -eq 0xEF -and $fmjBytes[1] -eq 0xBB -and $fmjBytes[2] -eq 0xBF) {
+    throw 'staged fabric.mod.json has a UTF-8 BOM - refusing to build'
+}
+[System.IO.File]::WriteAllBytes((Join-Path $pkg 'fabric.mod.json'), $fmjBytes)
 Copy-Item (Join-Path $root 'src\main\resources\bilifix_logo.png')  $pkg -Force
 Write-Host 'mixins.json staged with compatibilityLevel=JAVA_17' -ForegroundColor Green
 
